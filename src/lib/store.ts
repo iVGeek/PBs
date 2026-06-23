@@ -1,17 +1,9 @@
-// Simple client-side store using localStorage
-
-import type { Medal, PersonalBest, BibNumber, Achievement, Shoe, RaceCalendar } from '@/types'
+import type { Medal, PersonalBest, BibNumber } from '@/types'
 
 const KEYS = {
-  medals: 'pbs_medals',
-  pbs: 'pbs_personal_bests',
-  bibs: 'pbs_bibs',
-  achievements: 'pbs_achievements',
-  shoes: 'pbs_shoes',
-  races: 'pbs_races',
-  stravaConnected: 'pbs_strava_connected',
-  stravaAthlete: 'pbs_strava_athlete',
-  onboardingDone: 'pbs_onboarding',
+  medals: 'mh_medals',
+  pbs: 'mh_personal_bests',
+  bibs: 'mh_bibs',
 } as const
 
 function getStore<T>(key: string, fallback: T): T {
@@ -31,7 +23,6 @@ function setStore<T>(key: string, value: T): void {
   } catch { /* noop */ }
 }
 
-// Medals
 export function getMedals(): Medal[] {
   return getStore<Medal[]>(KEYS.medals, [])
 }
@@ -47,7 +38,6 @@ export function deleteMedal(id: string): void {
   setMedals(getMedals().filter(m => m.id !== id))
 }
 
-// Personal Bests
 export function getPBs(): PersonalBest[] {
   return getStore<PersonalBest[]>(KEYS.pbs, [])
 }
@@ -63,7 +53,6 @@ export function deletePB(id: string): void {
   setPBs(getPBs().filter(p => p.id !== id))
 }
 
-// Bibs
 export function getBibs(): BibNumber[] {
   return getStore<BibNumber[]>(KEYS.bibs, [])
 }
@@ -79,48 +68,34 @@ export function deleteBib(id: string): void {
   setBibs(getBibs().filter(b => b.id !== id))
 }
 
-// Achievements
-export function getAchievements(): Achievement[] {
-  return getStore<Achievement[]>(KEYS.achievements, [])
-}
-export function setAchievements(achievements: Achievement[]): void {
-  setStore(KEYS.achievements, achievements)
-}
+export function seedSampleData(): void {
+  const medals = getMedals()
+  if (medals.length > 0) return
 
-// Shoes
-export function getShoes(): Shoe[] {
-  return getStore<Shoe[]>(KEYS.shoes, [])
-}
-export function setShoes(shoes: Shoe[]): void {
-  setStore(KEYS.shoes, shoes)
-}
+  const sampleMedals: Medal[] = [
+    { id: 'm1', raceName: 'London Marathon 2024', eventDate: '2024-04-21', location: 'London, UK', distance: 'Marathon', time: '3:45:22', pace: '5:20', place: 1250, category: 'Senior Men', medalColor: 'gold', notes: 'Incredible atmosphere! Beat my target by 5 minutes.' },
+    { id: 'm2', raceName: 'Brighton 10K', eventDate: '2024-03-10', location: 'Brighton, UK', distance: '10K', time: '42:15', pace: '4:13', place: 89, category: 'Senior Men', medalColor: 'silver', notes: 'Flat and fast course. New PB!' },
+    { id: 'm3', raceName: 'Parkrun #50', eventDate: '2024-06-01', location: 'Bushy Park, London', distance: '5K', time: '19:48', pace: '3:57', place: 5, category: 'Senior Men', medalColor: 'bronze', notes: 'Sub-20! Milestone achievement.' },
+    { id: 'm4', raceName: 'Berlin Marathon 2023', eventDate: '2023-09-24', location: 'Berlin, Germany', distance: 'Marathon', time: '3:52:10', pace: '5:30', place: 2100, category: 'Senior Men', medalColor: 'gold', notes: 'First marathon! Unforgettable experience.' },
+    { id: 'm5', raceName: 'Royal Parks Half', eventDate: '2023-10-08', location: 'London, UK', distance: 'Half Marathon', time: '1:42:30', pace: '4:51', place: 340, category: 'Senior Men', medalColor: 'silver', notes: 'Scenic route through Hyde Park.' },
+    { id: 'm6', raceName: 'Great North Run', eventDate: '2024-09-08', location: 'Newcastle, UK', distance: 'Half Marathon', time: '1:40:15', pace: '4:45', place: 210, category: 'Senior Men', medalColor: 'bronze', notes: 'Best half marathon experience!' },
+  ]
+  setMedals(sampleMedals)
 
-// Race Calendar
-export function getRaces(): RaceCalendar[] {
-  return getStore<RaceCalendar[]>(KEYS.races, [])
-}
-export function setRaces(races: RaceCalendar[]): void {
-  setStore(KEYS.races, races)
-}
+  const samplePBs: PersonalBest[] = [
+    { id: 'pb1', distance: '5K', time: '19:48', pace: '3:57', date: '2024-06-01', race: 'Parkrun #50' },
+    { id: 'pb2', distance: '10K', time: '42:15', pace: '4:13', date: '2024-03-10', race: 'Brighton 10K' },
+    { id: 'pb3', distance: 'Half Marathon', time: '1:40:15', pace: '4:45', date: '2024-09-08', race: 'Great North Run' },
+    { id: 'pb4', distance: 'Marathon', time: '3:45:22', pace: '5:20', date: '2024-04-21', race: 'London Marathon 2024' },
+    { id: 'pb5', distance: '1 Mile', time: '6:05', pace: '3:47', date: '2024-05-15', race: 'Mile Time Trial' },
+  ]
+  setPBs(samplePBs)
 
-// Strava
-export function getStravaConnected(): boolean {
-  return getStore<boolean>(KEYS.stravaConnected, false)
-}
-export function setStravaConnected(val: boolean): void {
-  setStore(KEYS.stravaConnected, val)
-}
-export function getStravaAthlete(): any {
-  return getStore<any>(KEYS.stravaAthlete, null)
-}
-export function setStravaAthlete(data: any): void {
-  setStore(KEYS.stravaAthlete, data)
-}
-
-// Onboarding
-export function getOnboardingDone(): boolean {
-  return getStore<boolean>(KEYS.onboardingDone, false)
-}
-export function setOnboardingDone(val: boolean): void {
-  setStore(KEYS.onboardingDone, val)
+  const sampleBibs: BibNumber[] = [
+    { id: 'b1', number: 'A1250', raceName: 'London Marathon 2024', eventDate: '2024-04-21', distance: 'Marathon', notes: 'First marathon bib!' },
+    { id: 'b2', number: '089', raceName: 'Brighton 10K', eventDate: '2024-03-10', distance: '10K', notes: 'Windy conditions but held on!' },
+    { id: 'b3', number: '42195', raceName: 'Berlin Marathon 2023', eventDate: '2023-09-24', distance: 'Marathon', notes: 'Berlin - wave 2 start.' },
+    { id: 'b4', number: 'GNR77', raceName: 'Great North Run', eventDate: '2024-09-08', distance: 'Half Marathon', notes: 'Iconic race.' },
+  ]
+  setBibs(sampleBibs)
 }

@@ -10,26 +10,26 @@
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 142 76% 36%;
+    --primary: 38 92% 50%;
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 12%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 12%;
     --muted-foreground: 0 0% 63.9%;
-    --accent: 142 76% 36%;
+    --accent: 38 92% 50%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
-    --ring: 142 76% 36%;
+    --ring: 38 92% 50%;
     --radius: 0.5rem;
   }
 }
 
 @layer utilities {
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-running-400 to-running-600;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-amber-600;
   }
 }
 

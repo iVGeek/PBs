@@ -2,16 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Medal, Trophy, Hash, Activity, LayoutDashboard, Menu, X } from 'lucide-react'
+import { Medal, Trophy, Hash, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/medals', label: 'Medals', icon: Medal },
+  { href: '/', label: 'Medal Wall', icon: Medal },
   { href: '/pbs', label: 'Personal Bests', icon: Trophy },
   { href: '/bibs', label: 'Bib Numbers', icon: Hash },
-  { href: '/activities', label: 'Activities', icon: Activity },
 ]
 
 export function Navbar() {
@@ -22,8 +20,8 @@ export function Navbar() {
     <nav className="fixed top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold">
-          <Medal className="h-5 w-5 text-running-500" />
-          <span className="text-gradient">PBs &amp; Medals</span>
+          <Medal className="h-5 w-5 text-amber-500" />
+          <span className="text-gradient">Medal Holder</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
@@ -36,9 +34,7 @@ export function Navbar() {
                 href={item.href}
                 className={cn(
                   'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  active
-                    ? 'bg-running-500/10 text-running-400'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  active ? 'bg-amber-500/10 text-amber-400' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -69,9 +65,7 @@ export function Navbar() {
                   onClick={() => setOpen(false)}
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-running-500/10 text-running-400'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    active ? 'bg-amber-500/10 text-amber-400' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                   )}
                 >
                   <Icon className="h-4 w-4" />
