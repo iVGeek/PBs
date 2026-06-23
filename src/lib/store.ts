@@ -73,12 +73,12 @@ export function seedSampleData(): void {
   if (medals.length > 0) return
 
   const sampleMedals: Medal[] = [
-    { id: 'm1', raceName: 'London Marathon 2024', eventDate: '2024-04-21', location: 'London, UK', distance: 'Marathon', time: '3:45:22', pace: '5:20', place: 1250, category: 'Senior Men', medalColor: 'gold', notes: 'Incredible atmosphere! Beat my target by 5 minutes.' },
-    { id: 'm2', raceName: 'Brighton 10K', eventDate: '2024-03-10', location: 'Brighton, UK', distance: '10K', time: '42:15', pace: '4:13', place: 89, category: 'Senior Men', medalColor: 'silver', notes: 'Flat and fast course. New PB!' },
-    { id: 'm3', raceName: 'Parkrun #50', eventDate: '2024-06-01', location: 'Bushy Park, London', distance: '5K', time: '19:48', pace: '3:57', place: 5, category: 'Senior Men', medalColor: 'bronze', notes: 'Sub-20! Milestone achievement.' },
-    { id: 'm4', raceName: 'Berlin Marathon 2023', eventDate: '2023-09-24', location: 'Berlin, Germany', distance: 'Marathon', time: '3:52:10', pace: '5:30', place: 2100, category: 'Senior Men', medalColor: 'gold', notes: 'First marathon! Unforgettable experience.' },
-    { id: 'm5', raceName: 'Royal Parks Half', eventDate: '2023-10-08', location: 'London, UK', distance: 'Half Marathon', time: '1:42:30', pace: '4:51', place: 340, category: 'Senior Men', medalColor: 'silver', notes: 'Scenic route through Hyde Park.' },
-    { id: 'm6', raceName: 'Great North Run', eventDate: '2024-09-08', location: 'Newcastle, UK', distance: 'Half Marathon', time: '1:40:15', pace: '4:45', place: 210, category: 'Senior Men', medalColor: 'bronze', notes: 'Best half marathon experience!' },
+    { id: 'm1', raceName: 'London Marathon 2024', eventDate: '2024-04-21', location: 'London, UK', distance: 'Marathon', time: '3:45:22', pace: '5:20', place: 1250, notes: 'Incredible atmosphere! Beat my target by 5 minutes.', isPB: true },
+    { id: 'm2', raceName: 'Brighton 10K', eventDate: '2024-03-10', location: 'Brighton, UK', distance: '10K', time: '42:15', pace: '4:13', place: 89, notes: 'Flat and fast course.', isPB: true },
+    { id: 'm3', raceName: 'Parkrun #50', eventDate: '2024-06-01', location: 'Bushy Park, London', distance: '5K', time: '19:48', pace: '3:57', place: 5, notes: 'Sub-20! Milestone achievement.', isPB: true },
+    { id: 'm4', raceName: 'Berlin Marathon 2023', eventDate: '2023-09-24', location: 'Berlin, Germany', distance: 'Marathon', time: '3:52:10', pace: '5:30', place: 2100, notes: 'First marathon! Unforgettable experience.' },
+    { id: 'm5', raceName: 'Royal Parks Half', eventDate: '2023-10-08', location: 'London, UK', distance: 'Half Marathon', time: '1:42:30', pace: '4:51', place: 340, notes: 'Scenic route through Hyde Park.' },
+    { id: 'm6', raceName: 'Great North Run', eventDate: '2024-09-08', location: 'Newcastle, UK', distance: 'Half Marathon', time: '1:40:15', pace: '4:45', place: 210, notes: 'Best half marathon experience!', isPB: true },
   ]
   setMedals(sampleMedals)
 
