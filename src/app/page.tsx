@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Plus, Medal, Clock, MapPin, Trash2, Trophy, Hash, Camera, X, Sparkles, ArrowRight, Timer, Map, Target } from 'lucide-react'
-import { getMedals, addMedal, deleteMedal, seedSampleData, getPBs, getBibs } from '@/lib/store'
+import { Plus, Medal, Clock, MapPin, Trash2, Trophy, Hash, Camera, X, Sparkles, ArrowRight, Timer, Map, Target, Zap, Gauge } from 'lucide-react'
+import { getMedals, addMedal, deleteMedal, seedSampleData, getBibs, mergeComputedPBs } from '@/lib/store'
 import { generateId, formatDate } from '@/lib/utils'
-import type { Medal as MedalType } from '@/types'
+import type { Medal as MedalType, PersonalBest } from '@/types'
 import { Modal } from '@/components/Modal'
 import { EmptyState } from '@/components/EmptyState'
 import { toast } from '@/components/Toaster'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { useProfile } from '@/components/ProfileProvider'
+import { upscaleImage } from '@/lib/upscale'
 import Link from 'next/link'
 
 const distances = ['5K', '10K', 'Half Marathon', 'Marathon', '10 Mile', '5 Mile', '1 Mile', 'Other']
@@ -22,10 +25,13 @@ function readFileAsDataURL(file: File): Promise<string> {
 }
 
 export default function MedalWall() {
+  const { profile } = useProfile()
   const [medals, setMedals] = useState<MedalType[]>([])
+  const [computedPBs, setComputedPBs] = useState<PersonalBest[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [enhancing, setEnhancing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     raceName: '', eventDate: '', location: '', distance: '10K',
@@ -35,17 +41,27 @@ export default function MedalWall() {
   useEffect(() => {
     seedSampleData()
     setMedals(getMedals())
+    setComputedPBs(mergeComputedPBs())
     setIsLoaded(true)
   }, [])
 
-  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 2 * 1024 * 1024) {
       toast('Image too large (max 2MB)', 'error')
       return
     }
-    readFileAsDataURL(file).then(setImagePreview).catch(() => toast('Failed to read image', 'error'))
+    try {
+      const dataUrl = await readFileAsDataURL(file)
+      setEnhancing(true)
+      const hd = await upscaleImage(dataUrl)
+      setImagePreview(hd)
+      setEnhancing(false)
+    } catch {
+      setEnhancing(false)
+      toast('Failed to read image', 'error')
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -78,99 +94,191 @@ export default function MedalWall() {
 
   if (!isLoaded) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
-      </div>
+      <LoadingSpinner />
     )
   }
 
-  const pbs = getPBs()
   const bibs = getBibs()
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       {/* Hero Section */}
-      <div className="relative mb-16 overflow-hidden rounded-3xl border border-white/5 bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-transparent p-8 sm:p-12">
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-amber-500/20 blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-orange-500/10 blur-3xl" />
-        <div className="relative">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-4 py-1.5 text-sm font-medium text-amber-300">
-            <Sparkles className="h-3.5 w-3.5" />
-            Race Medal Collection
+      <div className="relative mb-16 overflow-hidden rounded-3xl border border-white/5 p-8 sm:p-12"
+        style={{ background: `linear-gradient(to bottom right, hsl(var(--accent) / 0.1), hsl(var(--accent) / 0.05), transparent)` }}>
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full glob-accent blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full glob-accent-dim blur-3xl" />
+        {/* Floating particles */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute left-[15%] top-[20%] h-2 w-2 rounded-full bg-accent-bright/40 animate-float" />
+          <div className="absolute left-[75%] top-[30%] h-1.5 w-1.5 rounded-full bg-accent-dim/30 animate-float-slow" style={{ animationDelay: '-3s' }} />
+          <div className="absolute left-[40%] top-[60%] h-1 w-1 rounded-full bg-accent-muted/40 animate-float" style={{ animationDelay: '-5s' }} />
+          <div className="absolute left-[85%] top-[70%] h-2.5 w-2.5 rounded-full bg-accent-bright/20 animate-float-slow" style={{ animationDelay: '-7s' }} />
+          <div className="absolute left-[10%] top-[75%] h-1.5 w-1.5 rounded-full bg-accent/30 animate-float" style={{ animationDelay: '-2s' }} />
+        </div>
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex-1">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border-accent bg-accent-light px-4 py-1.5 text-sm font-medium text-accent">
+              <Sparkles className="h-3.5 w-3.5" />
+              Race Medal Collection
+            </div>
+            <h1 className="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
+              {profile?.name ? `${profile.name}'s ` : ''}Medal <span className="text-gradient-hero">Holder</span>
+            </h1>
+            <p className="mt-4 max-w-xl text-lg text-muted-foreground/80">
+              Your personal wall of race medals, personal bests, and bib numbers.
+              Every race tells a story worth keeping.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button onClick={() => setModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-accent transition-all hover:shadow-xl hover:scale-105 active:scale-95"
+                style={{ background: 'var(--gradient-btn)' }}>
+                <Plus className="h-4 w-4" />
+                Add Medal
+              </button>
+              <Link href="/pbs"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-medium text-white/70 backdrop-blur-sm transition-all hover:bg-white/10 hover:text-white">
+                <Trophy className="h-4 w-4" />
+                View PBs
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
-          <h1 className="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
-            Medal <span className="text-gradient-hero">Holder</span>
-          </h1>
-          <p className="mt-4 max-w-xl text-lg text-muted-foreground/80">
-            Your personal wall of race medals, personal bests, and bib numbers.
-            Every race tells a story worth keeping.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button onClick={() => setModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-600/30 transition-all hover:shadow-xl hover:shadow-amber-600/40 hover:scale-105 active:scale-95">
-              <Plus className="h-4 w-4" />
-              Add Medal
-            </button>
-            <Link href="/pbs"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-medium text-white/70 backdrop-blur-sm transition-all hover:bg-white/10 hover:text-white">
-              <Trophy className="h-4 w-4" />
-              View PBs
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
+
+          {/* PB Records Panel */}
+          {computedPBs.length > 0 && (
+            <div className="shrink-0 lg:w-72 w-full">
+              <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4 backdrop-blur-sm">
+                <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-accent uppercase tracking-wider">
+                  <Trophy className="h-3.5 w-3.5" />
+                  Personal Records
+                </div>
+                <div className="space-y-2">
+                  {computedPBs.slice(0, 5).map((pb) => (
+                    <Link key={pb.id} href="/pbs"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2 transition-all hover:bg-white/5 group">
+                      <span className="w-14 shrink-0 text-xs font-semibold text-white/60">{pb.distance}</span>
+                      <span className="flex-1 font-mono font-bold text-sm text-white group-hover:text-accent-bright transition-colors">{pb.time}</span>
+                      <span className="text-[11px] text-right text-muted-foreground truncate max-w-[90px]">{formatDate(pb.date)}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Stats Bar */}
       <div className="mb-10 grid gap-3 sm:grid-cols-3">
         <Link href="/pbs"
-          className="group relative overflow-hidden rounded-2xl border border-running-500/20 bg-gradient-to-br from-running-500/10 to-running-600/5 p-5 transition-all hover:shadow-lg hover:shadow-running-500/10 hover:-translate-y-0.5">
-          <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-running-500/10 blur-xl" />
+          className="group relative overflow-hidden rounded-2xl border-accent p-5 transition-all hover:shadow-accent hover:-translate-y-0.5"
+          style={{ background: `linear-gradient(to bottom right, hsl(var(--accent) / 0.1), hsl(var(--accent) / 0.05))` }}>
+          <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full glob-accent-dim blur-xl" />
           <div className="relative flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-running-500/20">
-              <Trophy className="h-6 w-6 text-running-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent">
+              <Trophy className="h-6 w-6 text-accent-full" />
             </div>
             <div>
-              <div className="text-3xl font-bold text-white">{pbs.length}</div>
-              <div className="text-sm text-running-300/70">Personal Bests</div>
+              <div className="text-3xl font-bold text-white">{computedPBs.length}</div>
+              <div className="text-sm text-accent">Personal Bests</div>
             </div>
           </div>
         </Link>
 
-        <div className="group relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/10 to-amber-600/5 p-5 transition-all hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5">
-          <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-amber-500/10 blur-xl" />
+        <div className="group relative overflow-hidden rounded-2xl border-accent p-5 transition-all hover:shadow-accent hover:-translate-y-0.5"
+          style={{ background: `linear-gradient(to bottom right, hsl(var(--accent) / 0.1), hsl(var(--accent) / 0.05))` }}>
+          <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full glob-accent-dim blur-xl" />
           <div className="relative flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/20">
-              <Medal className="h-6 w-6 text-amber-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent">
+              <Medal className="h-6 w-6 text-accent-full" />
             </div>
             <div>
               <div className="text-3xl font-bold text-white">{medals.length}</div>
-              <div className="text-sm text-amber-300/70">Medals Earned</div>
+              <div className="text-sm text-accent">Medals Earned</div>
             </div>
           </div>
         </div>
 
         <Link href="/bibs"
-          className="group relative overflow-hidden rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-blue-600/5 p-5 transition-all hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-0.5">
-          <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-blue-500/10 blur-xl" />
+          className="group relative overflow-hidden rounded-2xl border-accent p-5 transition-all hover:shadow-accent hover:-translate-y-0.5"
+          style={{ background: `linear-gradient(to bottom right, hsl(var(--accent) / 0.1), hsl(var(--accent) / 0.05))` }}>
+          <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full glob-accent-dim blur-xl" />
           <div className="relative flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
-              <Hash className="h-6 w-6 text-blue-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent">
+              <Hash className="h-6 w-6 text-accent-full" />
             </div>
             <div>
               <div className="text-3xl font-bold text-white">{bibs.length}</div>
-              <div className="text-sm text-blue-300/70">Bib Numbers</div>
+              <div className="text-sm text-accent">Bib Numbers</div>
             </div>
           </div>
         </Link>
       </div>
 
+      {/* Running Stats */}
+      {medals.filter(m => m.time || m.pace).length > 0 && (
+        <div className="mb-10 grid gap-3 sm:grid-cols-3">
+          {(() => {
+            const distMap: Record<string, number> = { '1 Mile': 1.609, '5K': 5, '5 Mile': 8.047, '10K': 10, '10 Mile': 16.093, 'Half Marathon': 21.098, 'Marathon': 42.195, '50K': 50 }
+            const totalKm = medals.reduce((sum, m) => sum + (distMap[m.distance] || 0), 0)
+            const paceToSec = (p: string) => { const x = p.split(':').map(Number); return x.length === 2 ? x[0] * 60 + x[1] : 0 }
+            const secToPace = (s: number) => { const m = Math.floor(s / 60); const sec = Math.round(s % 60); return `${m}:${sec.toString().padStart(2, '0')}` }
+            const paces = medals.filter(m => m.pace).map(m => paceToSec(m.pace!))
+            const fastestPace = paces.length ? secToPace(Math.min(...paces)) : null
+            const avgPace = paces.length ? secToPace(Math.round(paces.reduce((a, b) => a + b, 0) / paces.length)) : null
+            return (
+              <>
+                <div className="group relative overflow-hidden rounded-2xl border-accent p-5 transition-all hover:shadow-accent hover:-translate-y-0.5"
+                  style={{ background: `linear-gradient(to bottom right, hsl(var(--accent) / 0.1), hsl(var(--accent) / 0.05))` }}>
+                  <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full glob-accent-dim blur-xl" />
+                  <div className="relative flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent">
+                      <Target className="h-6 w-6 text-accent-full" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-white">{totalKm.toFixed(1)} <span className="text-sm font-normal text-accent">km</span></div>
+                      <div className="text-sm text-accent">Total Distance</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="group relative overflow-hidden rounded-2xl border-accent p-5 transition-all hover:shadow-accent hover:-translate-y-0.5"
+                  style={{ background: `linear-gradient(to bottom right, hsl(var(--accent) / 0.1), hsl(var(--accent) / 0.05))` }}>
+                  <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full glob-accent-dim blur-xl" />
+                  <div className="relative flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent">
+                      <Zap className="h-6 w-6 text-accent-full" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-white">{fastestPace || '—'}</div>
+                      <div className="text-sm text-accent">Fastest Pace</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="group relative overflow-hidden rounded-2xl border-accent p-5 transition-all hover:shadow-accent hover:-translate-y-0.5"
+                  style={{ background: `linear-gradient(to bottom right, hsl(var(--accent) / 0.1), hsl(var(--accent) / 0.05))` }}>
+                  <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full glob-accent-dim blur-xl" />
+                  <div className="relative flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent">
+                      <Gauge className="h-6 w-6 text-accent-full" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-white">{avgPace || '—'}</div>
+                      <div className="text-sm text-accent">Avg Pace</div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
+        </div>
+      )}
+
       {/* Medal Grid */}
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Medal className="h-5 w-5 text-amber-500" />
-          Your Medal Collection
-        </h2>
+          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Medal className="h-5 w-5 text-accent-full" />
+            {profile?.name ? `${profile.name}'s ` : ''}Medal Collection
+          </h2>
         <span className="text-sm text-muted-foreground">{medals.length} medal{medals.length !== 1 ? 's' : ''}</span>
       </div>
 
@@ -188,7 +296,7 @@ export default function MedalWall() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex justify-center">
             <div onClick={() => fileRef.current?.click()}
-              className="relative flex h-44 w-full cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all overflow-hidden group">
+              className="relative flex h-44 w-full cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 hover:border-accent-strong hover:bg-accent-subtle transition-all overflow-hidden group">
               {imagePreview ? (
                 <>
                   <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
@@ -197,8 +305,13 @@ export default function MedalWall() {
                     <X className="h-4 w-4" />
                   </button>
                 </>
+              ) : enhancing ? (
+                <div className="text-center text-accent-bright">
+                  <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-2 border-accent-strong border-t-transparent" />
+                  <span className="text-sm font-medium">Enhancing to HD...</span>
+                </div>
               ) : (
-                <div className="text-center text-muted-foreground group-hover:text-amber-400 transition-colors">
+                <div className="text-center text-muted-foreground group-hover:text-accent-bright transition-colors">
                   <Camera className="mx-auto h-10 w-10 mb-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                   <span className="text-sm font-medium">Upload medal photo</span>
                   <p className="text-xs text-muted-foreground/60 mt-1">Click to browse (max 2MB)</p>
@@ -211,18 +324,18 @@ export default function MedalWall() {
           <div>
             <label className="block text-sm font-medium mb-1.5 text-white/80">Race Name</label>
             <input required value={form.raceName} onChange={(e) => setForm({ ...form, raceName: e.target.value })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all" placeholder="London Marathon 2024" />
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all" placeholder="London Marathon 2024" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1.5 text-white/80">Date</label>
               <input required type="date" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all [color-scheme:dark]" />
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all [color-scheme:dark]" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5 text-white/80">Distance</label>
               <select value={form.distance} onChange={(e) => setForm({ ...form, distance: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all">
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all">
                 {distances.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
@@ -230,35 +343,35 @@ export default function MedalWall() {
           <div>
             <label className="block text-sm font-medium mb-1.5 text-white/80">Location</label>
             <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all" placeholder="London, UK" />
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all" placeholder="London, UK" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1.5 text-white/80">Finish Time</label>
               <input value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all font-mono" placeholder="3:45:22" />
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all font-mono" placeholder="3:45:22" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5 text-white/80">Pace</label>
               <input value={form.pace} onChange={(e) => setForm({ ...form, pace: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all" placeholder="5:20 /km" />
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all" placeholder="5:20 /km" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1.5 text-white/80">Place</label>
               <input type="number" value={form.place} onChange={(e) => setForm({ ...form, place: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all" placeholder="1250" />
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all" placeholder="1250" />
             </div>
             <div className="flex items-end pb-2.5">
               <label className="flex items-center gap-3 cursor-pointer group">
                 <div className="relative">
                   <input type="checkbox" checked={form.isPB} onChange={(e) => setForm({ ...form, isPB: e.target.checked })}
-                    className="peer h-5 w-5 rounded-lg border border-white/20 bg-white/5 text-running-500 focus:ring-running-500/50 focus:ring-offset-0 cursor-pointer" />
-                  <div className="pointer-events-none absolute inset-0 rounded-lg bg-running-500/20 opacity-0 peer-checked:opacity-100 transition-opacity" />
+                    className="peer h-5 w-5 rounded-lg border border-white/20 bg-white/5 text-accent-full ring-accent focus:ring-offset-0 cursor-pointer" />
+                  <div className="pointer-events-none absolute inset-0 rounded-lg bg-accent opacity-0 peer-checked:opacity-100 transition-opacity" />
                 </div>
                 <span className="text-sm font-medium text-white/70 group-hover:text-white transition-colors flex items-center gap-1.5">
-                  <Trophy className="h-4 w-4 text-running-400" />
+                  <Trophy className="h-4 w-4 text-accent-bright" />
                   Personal Best
                 </span>
               </label>
@@ -267,13 +380,14 @@ export default function MedalWall() {
           <div>
             <label className="block text-sm font-medium mb-1.5 text-white/80">Notes</label>
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all resize-none" rows={3} placeholder="How did it go?" />
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all resize-none" rows={3} placeholder="How did it go?" />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setModalOpen(false); setImagePreview(null) }}
               className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-all">Cancel</button>
             <button type="submit"
-              className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-600/20 transition-all hover:shadow-xl hover:shadow-amber-600/30 hover:scale-105 active:scale-95">Save Medal</button>
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent transition-all hover:shadow-xl hover:scale-105 active:scale-95"
+              style={{ background: 'var(--gradient-btn)' }}>Save Medal</button>
           </div>
         </form>
       </Modal>
@@ -286,7 +400,7 @@ function MedalCard({ medal, onDelete, index }: { medal: MedalType; onDelete: (id
 
   return (
     <div
-      className="group relative inline-block w-full animate-fade-up break-inside-avoid rounded-2xl border border-white/5 bg-gradient-to-b from-[#1e1e2e] to-[#181825] overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-1 hover:border-amber-500/20"
+      className="group relative inline-block w-full animate-fade-up break-inside-avoid rounded-2xl border border-white/5 bg-gradient-to-b from-[#1e1e2e] to-[#181825] overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-accent hover:-translate-y-1 hover:border-accent"
       style={{ animationDelay: `${index * 80}ms` }}
     >
       {/* Delete button */}
@@ -297,7 +411,8 @@ function MedalCard({ medal, onDelete, index }: { medal: MedalType; onDelete: (id
 
       {/* PB Badge */}
       {medal.isPB && (
-        <div className="absolute left-3 top-3 z-10 rounded-full bg-gradient-to-r from-running-500 to-running-600 px-3 py-1 text-xs font-bold text-white shadow-lg shadow-running-500/40 flex items-center gap-1.5">
+        <div className="absolute left-3 top-3 z-10 rounded-full px-3 py-1 text-xs font-bold text-white shadow-lg flex items-center gap-1.5"
+          style={{ background: 'var(--gradient-btn)' }}>
           <Trophy className="h-3 w-3" />
           PERSONAL BEST
         </div>
@@ -312,10 +427,10 @@ function MedalCard({ medal, onDelete, index }: { medal: MedalType; onDelete: (id
             <div className="absolute inset-0 bg-gradient-to-t from-[#181825] via-transparent to-transparent" />
           </div>
         ) : (
-          <div className="flex aspect-[4/3] w-full items-center justify-center bg-gradient-to-br from-amber-500/5 via-amber-600/5 to-transparent">
+          <div className="flex aspect-[4/3] w-full items-center justify-center bg-accent-subtle">
             <div className="text-center">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
-                <Medal className="h-8 w-8 text-amber-500/30" />
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-accent-light">
+                <Medal className="h-8 w-8 text-accent-dim" />
               </div>
               <p className="text-xs font-medium text-white/30">{medal.distance}</p>
             </div>
@@ -331,7 +446,7 @@ function MedalCard({ medal, onDelete, index }: { medal: MedalType; onDelete: (id
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
           {medal.time && (
             <span className="flex items-center gap-1.5 text-sm">
-              <Timer className="h-3.5 w-3.5 text-amber-400/70" />
+              <Timer className="h-3.5 w-3.5 text-accent-muted" />
               <span className="font-mono font-semibold text-white/80">{medal.time}</span>
             </span>
           )}

@@ -8,6 +8,9 @@ import type { BibNumber } from '@/types'
 import { Modal } from '@/components/Modal'
 import { EmptyState } from '@/components/EmptyState'
 import { toast } from '@/components/Toaster'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { useProfile } from '@/components/ProfileProvider'
+import { upscaleImage } from '@/lib/upscale'
 import Link from 'next/link'
 
 const distances = ['5K', '10K', 'Half Marathon', 'Marathon', '10 Mile', '5 Mile', '1 Mile', 'Other']
@@ -25,7 +28,7 @@ function BibCard({ bib, onDelete, index }: { bib: BibNumber; onDelete: (id: stri
   const [imgError, setImgError] = useState(false)
   return (
     <div
-      className="group relative animate-fade-up rounded-2xl border border-white/5 bg-gradient-to-b from-[#1e1e2e] to-[#181825] overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1 hover:border-blue-500/20"
+      className="group relative animate-fade-up rounded-2xl border border-white/5 bg-gradient-to-b from-[#1e1e2e] to-[#181825] overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-accent hover:-translate-y-1 hover:border-accent"
       style={{ animationDelay: `${index * 80}ms` }}
     >
       <button onClick={() => onDelete(bib.id)}
@@ -40,10 +43,10 @@ function BibCard({ bib, onDelete, index }: { bib: BibNumber; onDelete: (id: stri
             <div className="absolute inset-0 bg-gradient-to-t from-[#181825] via-transparent to-transparent" />
           </div>
         ) : (
-          <div className="flex aspect-[4/3] w-full items-center justify-center bg-gradient-to-br from-blue-500/5 via-blue-600/5 to-transparent">
+          <div className="flex aspect-[4/3] w-full items-center justify-center bg-accent-subtle">
             <div className="text-center">
-              <Hash className="mx-auto h-8 w-8 text-blue-500/30 mb-2" />
-              <span className="block font-mono text-2xl font-bold tracking-[0.2em] text-blue-400/60">{bib.number}</span>
+              <Hash className="mx-auto h-8 w-8 text-accent-dim mb-2" />
+              <span className="block font-mono text-2xl font-bold tracking-[0.2em] text-accent-muted">{bib.number}</span>
             </div>
           </div>
         )}
@@ -63,10 +66,12 @@ function BibCard({ bib, onDelete, index }: { bib: BibNumber; onDelete: (id: stri
 }
 
 export default function BibsPage() {
+  const { profile } = useProfile()
   const [bibs, setBibs] = useState<BibNumber[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [enhancing, setEnhancing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({ number: '', raceName: '', eventDate: '', distance: '10K', notes: '' })
 
@@ -76,11 +81,20 @@ export default function BibsPage() {
     setIsLoaded(true)
   }, [])
 
-  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 2 * 1024 * 1024) { toast('Image too large (max 2MB)', 'error'); return }
-    readFileAsDataURL(file).then(setImagePreview).catch(() => toast('Failed to read image', 'error'))
+    try {
+      const dataUrl = await readFileAsDataURL(file)
+      setEnhancing(true)
+      const hd = await upscaleImage(dataUrl)
+      setImagePreview(hd)
+      setEnhancing(false)
+    } catch {
+      setEnhancing(false)
+      toast('Failed to read image', 'error')
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -96,24 +110,26 @@ export default function BibsPage() {
   function handleDelete(id: string) { deleteBib(id); setBibs(getBibs()); toast('Bib removed', 'info') }
 
   if (!isLoaded) {
-    return <div className="flex h-[60vh] items-center justify-center"><div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" /></div>
+    return <LoadingSpinner />
   }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       {/* Hero */}
-      <div className="relative mb-10 overflow-hidden rounded-3xl border border-white/5 bg-gradient-to-br from-blue-500/10 via-blue-600/5 to-transparent p-8 sm:p-12">
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+      <div className="relative mb-10 overflow-hidden rounded-3xl border border-white/5 p-8 sm:p-12"
+        style={{ background: `linear-gradient(to bottom right, hsl(var(--accent) / 0.1), hsl(var(--accent) / 0.05), transparent)` }}>
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full glob-accent blur-3xl" />
         <div className="relative">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-sm font-medium text-blue-300">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border-accent bg-accent-light px-4 py-1.5 text-sm font-medium text-accent">
             <Sparkles className="h-3.5 w-3.5" />
             Race Bib Collection
           </div>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl text-white">Bib Numbers</h1>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl text-white">{profile?.name ? `${profile.name}'s ` : ''}Bib Numbers</h1>
           <p className="mt-3 max-w-lg text-muted-foreground/80">Every race starts with a number. Keep your collection in one place.</p>
           <div className="mt-6 flex gap-3">
             <button onClick={() => setModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition-all hover:shadow-xl hover:shadow-blue-600/40 hover:scale-105 active:scale-95">
+              className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent transition-all hover:shadow-xl hover:scale-105 active:scale-95"
+              style={{ background: 'var(--gradient-btn)' }}>
               <Plus className="h-4 w-4" /> Add Bib
             </button>
             <Link href="/"
@@ -135,13 +151,18 @@ export default function BibsPage() {
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setImagePreview(null) }} title="Add Bib Number">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div onClick={() => fileRef.current?.click()}
-            className="relative flex h-36 w-full cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all overflow-hidden group">
+            className="relative flex h-36 w-full cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 hover:border-accent-strong hover:bg-accent-subtle transition-all overflow-hidden group">
             {imagePreview ? (
               <><img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
                 <button type="button" onClick={(e) => { e.stopPropagation(); setImagePreview(null); if (fileRef.current) fileRef.current.value = '' }}
                   className="absolute top-3 right-3 rounded-full bg-black/70 p-1.5 text-white hover:bg-red-500/80 transition-colors"><X className="h-4 w-4" /></button></>
+            ) : enhancing ? (
+              <div className="text-center text-accent-bright">
+                <div className="mx-auto mb-1 h-7 w-7 animate-spin rounded-full border-2 border-accent-strong border-t-transparent" />
+                <span className="text-sm font-medium">Enhancing to HD...</span>
+              </div>
             ) : (
-              <div className="text-center text-muted-foreground group-hover:text-blue-400 transition-colors">
+              <div className="text-center text-muted-foreground group-hover:text-accent-bright transition-colors">
                 <Camera className="mx-auto h-8 w-8 mb-1 opacity-50" />
                 <span className="text-sm font-medium">Upload bib photo</span>
               </div>
@@ -151,23 +172,23 @@ export default function BibsPage() {
           <div>
             <label className="block text-sm font-medium mb-1.5 text-white/80">Bib Number</label>
             <input required value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" placeholder="A1250" />
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all" placeholder="A1250" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5 text-white/80">Race Name</label>
             <input required value={form.raceName} onChange={(e) => setForm({ ...form, raceName: e.target.value })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" placeholder="London Marathon 2024" />
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all" placeholder="London Marathon 2024" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1.5 text-white/80">Date</label>
               <input required type="date" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all [color-scheme:dark]" />
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all [color-scheme:dark]" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5 text-white/80">Distance</label>
               <select value={form.distance} onChange={(e) => setForm({ ...form, distance: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all">
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all">
                 {distances.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
@@ -175,13 +196,14 @@ export default function BibsPage() {
           <div>
             <label className="block text-sm font-medium mb-1.5 text-white/80">Notes</label>
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all" rows={3} placeholder="Any memories?" />
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white resize-none focus:outline-none focus:ring-2 ring-accent focus:border-accent-strong transition-all" rows={3} placeholder="Any memories?" />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setModalOpen(false); setImagePreview(null) }}
               className="rounded-xl px-5 py-2.5 text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-all">Cancel</button>
             <button type="submit"
-              className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:shadow-xl hover:shadow-blue-600/30 hover:scale-105 active:scale-95">Save Bib</button>
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent transition-all hover:shadow-xl hover:scale-105 active:scale-95"
+              style={{ background: 'var(--gradient-btn)' }}>Save Bib</button>
           </div>
         </form>
       </Modal>
