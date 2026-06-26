@@ -14,6 +14,8 @@
   let place = $state<number | null>(null);
   let photoUrl = $state('');
   let notes = $state('');
+  let importing = $state(false);
+  let errorMsg = $state('');
 
   let totalMedals = $derived(medals.length);
   let uniqueDistances = $derived(new Set(medals.map(m => m.distance)).size);
@@ -49,22 +51,54 @@
     await loadMedals();
   }
 
+  function categorizeDistance(km: number): string | null {
+    if (km >= 4.8 && km <= 5.2) return '5K';
+    if (km >= 9.8 && km <= 10.2) return '10K';
+    if (km >= 20.8 && km <= 21.3) return '21.097';
+    if (km >= 41.8 && km <= 42.6) return '42.195';
+    return null;
+  }
+
   async function importFromStrava() {
-    const res = await fetch('/api/strava/import');
-    const data = await res.json();
-    if (data.activities) {
-      const running = data.activities.filter((a: any) => a.type === 'Run');
+    importing = true;
+    errorMsg = '';
+    try {
+      const res = await fetch('/api/strava/import');
+      const data = await res.json();
+      if (data.error) {
+        errorMsg = typeof data.error === 'string' ? data.error : 'Import failed. Try reconnecting Strava.';
+        importing = false;
+        return;
+      }
+      if (!data.activities) {
+        errorMsg = 'No activities found from Strava.';
+        importing = false;
+        return;
+      }
+      const runTypes = ['Run', 'TrailRun', 'VirtualRun'];
+      const running = data.activities.filter((a: any) => runTypes.includes(a.type));
+      if (running.length === 0) {
+        errorMsg = 'No running activities found.';
+        importing = false;
+        return;
+      }
+      let imported = 0;
       for (const act of running) {
-        const d = (act.distance / 1000).toFixed(3);
-        const dist = d === '5.000' ? '5K' : d === '10.000' ? '10K' : d === '21.097' ? '21.097' : d === '42.195' ? '42.195' : null;
+        const km = act.distance / 1000;
+        const dist = categorizeDistance(km);
         if (!dist || medals.some((m: any) => m.raceName === act.name)) continue;
-        await fetch('/api/medals', {
+        const res2 = await fetch('/api/medals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ raceName: act.name, eventDate: act.start_date, distance: dist, timeSeconds: Math.round(act.moving_time), place: null }),
         });
+        if (res2.ok) imported++;
       }
       await loadMedals();
+      importing = false;
+    } catch (e) {
+      importing = false;
+      errorMsg = 'Network error. Please try again.';
     }
   }
 </script>
@@ -75,7 +109,7 @@
     <p class="text-sm" style="color: var(--text-secondary);">{totalMedals} medals · {uniqueDistances} distances</p>
   </div>
   <div class="flex gap-2">
-    <button class="btn btn-secondary text-sm" onclick={importFromStrava}>Import Strava</button>
+    <button class="btn btn-secondary text-sm" onclick={importFromStrava} disabled={importing}>{importing ? 'Importing...' : 'Import Strava'}</button>
     <button class="btn btn-primary text-sm" onclick={() => showForm = true}>+ Add Medal</button>
   </div>
 </div>
@@ -94,6 +128,12 @@
     <div class="stat-label">Total</div>
   </div>
 </div>
+
+{#if errorMsg}
+  <div class="card mb-4" style="padding: 0.75rem 1rem; color: #ef4444; font-size: 0.875rem; border-color: #ef4444;">
+    {errorMsg}
+  </div>
+{/if}
 
 {#if medals.length === 0}
   <div class="card text-center" style="padding: 3rem 2rem;">
