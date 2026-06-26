@@ -1,4 +1,5 @@
-export const BASE_AMOUNT_KES = 50000;
+export const BASE_AMOUNT_KES = 5000;
+export const KES_FALLBACK_AMOUNT = 500000;
 
 const acceptLanguageCountry: Record<string, string> = {
   sw: 'KE', en: 'KE', om: 'KE', luo: 'KE', kam: 'KE',

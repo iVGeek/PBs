@@ -5,6 +5,7 @@
   let loading = $state(false);
   let paid = $state($page.data.user?.paid || false);
   let error = $state('');
+  let fallbackNote = $state('');
 
   $effect(() => {
     paid = $page.data.user?.paid || false;
@@ -12,6 +13,7 @@
 
   async function initPayment() {
     error = '';
+    fallbackNote = '';
     loading = true;
     try {
       const res = await fetch('/api/paystack/initialize', {
@@ -20,11 +22,14 @@
         body: JSON.stringify({
           email: $page.data.user?.email || 'runner@example.com',
           currency: $page.data.currency?.code || 'KES',
-          amount: $page.data.amount || 5000000,
+          amount: $page.data.amount || 500000,
         }),
       });
       const data = await res.json();
       loading = false;
+      if (data._fallbackFrom) {
+        fallbackNote = `${data._fallbackFrom} isn't available. Charging in KES instead.`;
+      }
       if (data.status && data.data?.authorization_url) {
         window.location.href = data.data.authorization_url;
       } else {
@@ -56,6 +61,9 @@
         <li>✓ Personal best tracking</li>
         <li>✓ Bib number collection</li>
       </ul>
+      {#if fallbackNote}
+        <p class="mb-3 text-sm" style="color: var(--text-secondary);">{fallbackNote}</p>
+      {/if}
       {#if error}
         <p class="mb-3 text-sm" style="color: #ef4444;">{error}</p>
       {/if}
