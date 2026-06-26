@@ -42,6 +42,7 @@ export const bibs = pgTable('bibs', {
   eventName: text('event_name').notNull(),
   eventDate: timestamp('event_date').notNull(),
   distance: text('distance'),
+  photoUrl: text('photo_url'),
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

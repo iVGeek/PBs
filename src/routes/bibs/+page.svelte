@@ -9,6 +9,8 @@
   let eventDate = $state('');
   let distance = $state('');
   let notes = $state('');
+  let photoUrl = $state('');
+  let photoPreview = $state('');
 
   async function loadBibs() {
     const res = await fetch('/api/bibs');
@@ -22,11 +24,11 @@
     const res = await fetch('/api/bibs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bibNumber: bibNumber.trim(), eventName: eventName.trim(), eventDate, distance: distance || undefined, notes: notes || undefined }),
+      body: JSON.stringify({ bibNumber: bibNumber.trim(), eventName: eventName.trim(), eventDate, distance: distance || undefined, photoUrl: photoUrl || undefined, notes: notes || undefined }),
     });
     if (res.ok) {
       showForm = false;
-      bibNumber = ''; eventName = ''; eventDate = ''; distance = ''; notes = '';
+      bibNumber = ''; eventName = ''; eventDate = ''; distance = ''; notes = ''; photoUrl = ''; photoPreview = '';
       await loadBibs();
     }
   }
@@ -59,9 +61,15 @@
     <div class="card">
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-16 rounded-lg flex items-center justify-center text-lg font-bold" style="background: var(--accent-light); color: var(--accent);">
-            {bib.bibNumber}
-          </div>
+          {#if bib.photoUrl}
+            <div class="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0">
+              <img src={bib.photoUrl} alt={bib.eventName} style="width: 100%; height: 100%; object-fit: cover;" />
+            </div>
+          {:else}
+            <div class="w-12 h-16 rounded-lg flex items-center justify-center text-lg font-bold" style="background: var(--accent-light); color: var(--accent);">
+              {bib.bibNumber}
+            </div>
+          {/if}
           <div>
             <h3 class="font-bold">{bib.eventName}</h3>
             <p class="text-xs" style="color: var(--text-secondary);">
@@ -104,6 +112,15 @@
               <option value={d}>{distMap[d] || d}</option>
             {/each}
           </select>
+        </div>
+        <div>
+          <label class="label">Photo (optional)</label>
+          <input class="input" type="file" accept="image/*" onchange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => { photoUrl = reader.result; photoPreview = reader.result; }; reader.readAsDataURL(file); } }} />
+          {#if photoPreview}
+            <div class="mt-2 w-20 h-20 rounded-lg overflow-hidden border" style="border-color: var(--border);">
+              <img src={photoPreview} alt="Preview" style="width: 100%; height: 100%; object-fit: cover;" />
+            </div>
+          {/if}
         </div>
         <div>
           <label class="label">Notes (optional)</label>

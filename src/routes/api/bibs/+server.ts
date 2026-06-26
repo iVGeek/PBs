@@ -21,6 +21,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     eventName: body.eventName,
     eventDate: new Date(body.eventDate),
     distance: body.distance ?? null,
+    photoUrl: body.photoUrl ?? null,
     notes: body.notes ?? null,
   }).returning();
   return json(bib, { status: 201 });

@@ -1,12 +1,17 @@
 export const distMap: Record<string, string> = {
   '5K': '5K',
   '10K': '10K',
-  '21.097': 'Half Marathon',
-  '42.195': 'Marathon',
+  '15K': '15K',
+  '21K': '21K (Half Marathon)',
+  '30K': '30K',
+  '35K': '35K',
+  '42K': '42K (Marathon)',
+  '21.097': '21K (Half Marathon)',
+  '42.195': '42K (Marathon)',
   '50K': '50K Ultra',
 };
 
-export const distanceOptions = ['5K', '10K', '21.097', '42.195', '50K'];
+export const distanceOptions = ['5K', '10K', '15K', '21K', '30K', '35K', '42K', '50K'];
 
 export function secondsToTime(s: number): string {
   const hrs = Math.floor(s / 3600);

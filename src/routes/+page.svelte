@@ -13,6 +13,7 @@
   let seconds = $state(0);
   let place = $state<number | null>(null);
   let photoUrl = $state('');
+  let photoPreview = $state('');
   let notes = $state('');
   let importing = $state(false);
   let errorMsg = $state('');
@@ -41,7 +42,7 @@
     });
     if (res.ok) {
       showForm = false;
-      raceName = ''; eventDate = ''; distance = '5K'; hours = 0; minutes = 0; seconds = 0; place = null; photoUrl = ''; notes = '';
+      raceName = ''; eventDate = ''; distance = '5K'; hours = 0; minutes = 0; seconds = 0; place = null; photoUrl = ''; photoPreview = ''; notes = '';
       await loadMedals();
     }
   }
@@ -51,12 +52,15 @@
     await loadMedals();
   }
 
-  function categorizeDistance(km: number): string | null {
+  function categorizeDistance(km: number): string {
     if (km >= 4.8 && km <= 5.2) return '5K';
     if (km >= 9.8 && km <= 10.2) return '10K';
-    if (km >= 20.8 && km <= 21.3) return '21.097';
-    if (km >= 41.8 && km <= 42.6) return '42.195';
-    return null;
+    if (km >= 14.8 && km <= 15.2) return '15K';
+    if (km >= 20.8 && km <= 21.3) return '21K';
+    if (km >= 29.8 && km <= 30.3) return '30K';
+    if (km >= 34.8 && km <= 35.3) return '35K';
+    if (km >= 41.8 && km <= 42.6) return '42K';
+    return km.toFixed(2) + ' km';
   }
 
   async function importFromStrava() {
@@ -86,7 +90,7 @@
       for (const act of running) {
         const km = act.distance / 1000;
         const dist = categorizeDistance(km);
-        if (!dist || medals.some((m: any) => m.raceName === act.name)) continue;
+        if (medals.some((m: any) => m.raceName === act.name)) continue;
         const res2 = await fetch('/api/medals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -96,6 +100,7 @@
       }
       await loadMedals();
       importing = false;
+      if (imported > 0) errorMsg = ''; else errorMsg = 'No new races to import.';
     } catch (e) {
       importing = false;
       errorMsg = 'Network error. Please try again.';
@@ -147,11 +152,16 @@
 <div class="grid gap-4">
   {#each medals as medal (medal.id)}
     <div class="card">
-      <div class="flex items-start justify-between">
-        <div class="flex-1">
+      <div class="flex items-start gap-3">
+        {#if medal.photoUrl}
+          <div class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+            <img src={medal.photoUrl} alt={medal.raceName} style="width: 100%; height: 100%; object-fit: cover;" />
+          </div>
+        {/if}
+        <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
-            <h3 class="font-bold text-lg">{medal.raceName}</h3>
-            <span class="badge">{distMap[medal.distance] || medal.distance}</span>
+            <h3 class="font-bold text-lg truncate">{medal.raceName}</h3>
+            <span class="badge shrink-0">{distMap[medal.distance] || medal.distance}</span>
           </div>
           <div class="flex flex-wrap gap-4 text-sm" style="color: var(--text-secondary);">
             <span>{new Date(medal.eventDate).toLocaleDateString()}</span>
@@ -162,7 +172,7 @@
             {/if}
           </div>
         </div>
-        <button class="text-xs btn btn-secondary" style="padding: 0.25rem 0.5rem;" onclick={() => deleteMedal(medal.id)}>✕</button>
+        <button class="text-xs btn btn-secondary shrink-0" style="padding: 0.25rem 0.5rem;" onclick={() => deleteMedal(medal.id)}>✕</button>
       </div>
     </div>
   {/each}
@@ -204,8 +214,13 @@
           <input class="input" type="number" bind:value={place} min="0" placeholder="Overall position" />
         </div>
         <div>
-          <label class="label">Photo URL (optional)</label>
-          <input class="input" bind:value={photoUrl} placeholder="https://..." />
+          <label class="label">Photo (optional)</label>
+          <input class="input" type="file" accept="image/*" onchange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => { photoUrl = reader.result; photoPreview = reader.result; }; reader.readAsDataURL(file); } }} />
+          {#if photoPreview}
+            <div class="mt-2 w-20 h-20 rounded-lg overflow-hidden border" style="border-color: var(--border);">
+              <img src={photoPreview} alt="Preview" style="width: 100%; height: 100%; object-fit: cover;" />
+            </div>
+          {/if}
         </div>
         <div>
           <label class="label">Notes (optional)</label>
