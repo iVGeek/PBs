@@ -36,7 +36,6 @@
 	},
 	"dependencies": {
 		"@lucia-auth/adapter-drizzle": "^1.1.0",
-		"geoip-lite": "^2.0.3",
 		"lucia": "^3.2.2",
 		"oslo": "^1.2.1"
 	}

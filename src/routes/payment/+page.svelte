@@ -19,7 +19,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: $page.data.user?.email || 'runner@example.com',
-          currency: $page.data.currency?.code || 'NGN',
+          currency: $page.data.currency?.code || 'KES',
+          amount: $page.data.amount || 5000000,
         }),
       });
       const data = await res.json();

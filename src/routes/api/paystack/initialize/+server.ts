@@ -3,7 +3,7 @@ import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, url }) => {
-  const { email, currency } = await request.json();
+  const { email, currency, amount } = await request.json();
   const baseUrl = env.PUBLIC_BASE_URL || url.origin;
 
   const res = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -14,8 +14,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     },
     body: JSON.stringify({
       email,
-      amount: 500000,
-      currency: currency || 'NGN',
+      amount: amount || 5000000,
+      currency: currency || 'KES',
       callback_url: `${baseUrl}/payment/callback`,
     }),
   });
