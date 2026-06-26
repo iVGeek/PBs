@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: pbs
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: node build/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
