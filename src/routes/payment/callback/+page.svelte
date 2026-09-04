@@ -7,10 +7,7 @@
 
   onMount(async () => {
     const ref = $page.url.searchParams.get('reference');
-    if (!ref) {
-      status = 'No payment reference found.';
-      return;
-    }
+    if (!ref) { status = 'No payment reference found.'; return; }
     const res = await fetch(`/api/paystack/verify?reference=${ref}`);
     const data = await res.json();
     if (data.status && data.data?.status === 'success') {
@@ -26,9 +23,9 @@
 </script>
 
 <div class="min-h-[70vh] flex items-center justify-center">
-  <div class="card max-w-md w-full text-center" style="padding: 3rem 2rem;">
-    <div class="text-5xl mb-4">{status.includes('failed') ? '❌' : status.includes('Redirecting') ? '✅' : '⏳'}</div>
-    <h1 class="text-xl font-bold mb-2">Payment {status.includes('failed') ? 'Failed' : status.includes('Redirecting') ? 'Successful' : 'Processing'}</h1>
-    <p style="color: var(--text-secondary);">{status}</p>
+  <div class="card max-w-md w-full text-center card-interactive" style="padding: 3.5rem 2rem;">
+    <div class="text-6xl mb-4">{status.includes('failed') ? '❌' : status.includes('Redirecting') ? '✅' : '⏳'}</div>
+    <h1 class="text-xl font-extrabold mb-2">Payment {status.includes('failed') ? 'Failed' : status.includes('Redirecting') ? 'Successful' : 'Processing'}</h1>
+    <p class="text-sm" style="color: var(--text-secondary);">{status}</p>
   </div>
 </div>
