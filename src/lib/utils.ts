@@ -106,13 +106,22 @@ export function computeAchievements(medals: { distance: string; timeSeconds: num
   totalKm = Math.round(totalKm * 10) / 10;
   const count = medals.length;
 
+  // Longest race distance completed (in km) — a longer race implies shorter distances are doable
+  let maxKm = 0;
+  for (const m of medals) {
+    const km = distanceKm[m.distance] ?? parseFloat(m.distance);
+    if (!isNaN(km) && km > maxKm) maxKm = km;
+  }
+  const canRun = (targetKm: number) => maxKm >= targetKm;
+
   const achievements: Achievement[] = [
     { id: 'first-steps', icon: '👟', label: 'First Steps', description: 'Complete your first race', unlocked: count >= 1 },
-    { id: 'runner-5k', icon: '🏃', label: '5K Runner', description: 'Complete a 5K', unlocked: (distCounts.get('5K') || 0) >= 1 },
-    { id: 'runner-10k', icon: '🏃‍♂️', label: '10K Runner', description: 'Complete a 10K', unlocked: (distCounts.get('10K') || 0) >= 1 },
-    { id: 'half-warrior', icon: '🏅', label: 'Half Warrior', description: 'Complete a Half Marathon', unlocked: (distCounts.get('21K') || 0) >= 1 },
-    { id: 'marathon-legend', icon: '🏆', label: 'Marathon Legend', description: 'Complete a Marathon', unlocked: (distCounts.get('42K') || 0) >= 1 },
-    { id: 'ultra-beast', icon: '⚡', label: 'Ultra Beast', description: 'Complete an Ultra', unlocked: (distCounts.get('50K') || 0) >= 1 },
+    { id: 'runner-5k', icon: '🏃', label: '5K Runner', description: 'Complete a 5K', unlocked: canRun(5) },
+    { id: 'runner-10k', icon: '🏃‍♂️', label: '10K Runner', description: 'Complete a 10K', unlocked: canRun(10) },
+    { id: 'runner-15k', icon: '🏃‍♀️', label: '15K Runner', description: 'Complete a 15K', unlocked: canRun(15) },
+    { id: 'half-warrior', icon: '🏅', label: 'Half Warrior', description: 'Complete a Half Marathon', unlocked: canRun(21.097) },
+    { id: 'marathon-legend', icon: '🏆', label: 'Marathon Legend', description: 'Complete a Marathon', unlocked: canRun(42.195) },
+    { id: 'ultra-beast', icon: '⚡', label: 'Ultra Beast', description: 'Complete an Ultra', unlocked: canRun(50) },
     { id: 'sub20-5k', icon: '⏱️', label: 'Speed Demon', description: 'Sub-20 minute 5K', unlocked: (distBests.get('5K') || Infinity) < 1200 },
     { id: 'sub40-10k', icon: '⚡', label: '10K Rocket', description: 'Sub-40 minute 10K', unlocked: (distBests.get('10K') || Infinity) < 2400 },
     { id: 'sub90-half', icon: '🚀', label: 'Half Sub-90', description: 'Sub-1:30 Half Marathon', unlocked: (distBests.get('21K') || Infinity) < 5400 },
