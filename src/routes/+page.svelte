@@ -345,12 +345,21 @@
     importing = true; errorMsg = ''; importProgress = 0; importTotal = 0;
     try {
       const res = await fetch('/api/strava/import');
-      const data = await res.json();
-      if (data.error) { errorMsg = typeof data.error === 'string' ? data.error : 'Import failed.'; importing = false; return; }
-      if (!data.activities) { errorMsg = 'No activities found.'; importing = false; return; }
+      let data: any = null;
+      try { data = await res.json(); } catch { /* non-JSON body */ }
+      if (!res.ok || data?.error) {
+        errorMsg = (data && typeof data.error === 'string') ? data.error
+          : (data?.message) ? data.message
+          : (res.status === 401) ? 'Strava token expired. Please reconnect Strava.'
+          : (res.status === 429) ? 'Strava rate limit reached. Please wait and try again.'
+          : 'Import failed. Please reconnect Strava.';
+        importing = false; return;
+      }
+      const acts = Array.isArray(data?.activities) ? data.activities : [];
+      if (acts.length === 0) { errorMsg = 'Strava returned no activities (check that you have running activities and that the app has activity:read_all permission).'; importing = false; return; }
       const runTypes = ['Run', 'TrailRun', 'VirtualRun'];
-      const running = data.activities.filter((a: any) => runTypes.includes(a.type));
-      if (running.length === 0) { errorMsg = 'No running activities found.'; importing = false; return; }
+      const running = acts.filter((a: any) => runTypes.includes(a.type));
+      if (running.length === 0) { errorMsg = 'No running activities found — only Run/TrailRun/VirtualRun are imported.'; importing = false; return; }
       // Skip anything already imported (by Strava activity id, with name fallback for legacy rows)
       const existingById = new Set(medals.map((m: any) => m.stravaActivityId).filter(Boolean));
       const existingByName = new Set(medals.map((m: any) => m.raceName));
@@ -374,6 +383,7 @@
       importing = false;
       errorMsg = '';
       if (imported > 0) importSuccess = `Imported ${imported} race${imported !== 1 ? 's' : ''}${skipped ? ` · ${skipped} skipped` : ''}.`;
+      else errorMsg = 'No new races could be imported.';
     } catch { importing = false; errorMsg = 'Network error. Please try again.'; }
   }
 

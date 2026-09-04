@@ -51,14 +51,31 @@ export async function getStravaActivities(dbUser: DbUser): Promise<{ ok: boolean
     let page = 1;
     const perPage = 200;
     for (;;) {
-      const res = await fetch(
-        `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}&page=${page}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}&page=${page}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+      } catch {
+        return { ok: false, error: { type: 'network' } };
+      }
       if (res.status === 401) return { ok: false, error: { type: 'unauthorized' } };
       if (res.status === 429) return { ok: false, error: { type: 'rate_limited' } };
-      if (!res.ok) return { ok: false, error: (await res.json()) };
-      const batch = (await res.json()) as any[];
+      if (!res.ok) {
+        let body: any = { message: `Strava error ${res.status}` };
+        try { body = await res.json(); } catch { /* ignore */ }
+        return { ok: false, error: body };
+      }
+      let batch: any[];
+      try {
+        batch = (await res.json()) as any[];
+      } catch {
+        return { ok: false, error: { type: 'parse' } };
+      }
+      if (!Array.isArray(batch)) {
+        return { ok: false, error: { type: 'parse', message: 'Unexpected response from Strava' } };
+      }
       all.push(...batch);
       if (batch.length < perPage) break;
       page++;
