@@ -4,6 +4,7 @@ import { lucia } from '$lib/server/auth';
 import { db } from '$lib/server/db';
 import { userTable } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { syncStravaToMedals } from '$lib/server/strava';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
@@ -65,6 +66,15 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     path: '/',
     ...sessionCookie.attributes,
   });
+
+  // Auto-sync Strava runs into medals for returning (onboarded) users
+  if (user.onboardingComplete) {
+    try {
+      await syncStravaToMedals(user.id);
+    } catch {
+      // non-fatal: manual import is still available in-app
+    }
+  }
 
   redirect(302, user.onboardingComplete ? (user.paid ? '/' : '/payment') : '/register');
 };

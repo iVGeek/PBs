@@ -47,3 +47,16 @@ export const bibs = pgTable('bibs', {
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const goals = pgTable('goals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').notNull().references(() => userTable.id),
+  name: text('name').notNull(),
+  targetDistance: text('target_distance'),
+  targetTimeSeconds: integer('target_time_seconds'),
+  targetDate: timestamp('target_date'),
+  targetRaces: integer('target_races'),
+  note: text('note'),
+  completed: boolean('completed').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

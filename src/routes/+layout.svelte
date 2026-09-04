@@ -22,6 +22,7 @@
         <div class="hidden md:flex items-center gap-1">
           <a href="/" class="nav-link" class:active={$page.url.pathname === '/'}>Dashboard</a>
           <a href="/pbs" class="nav-link" class:active={$page.url.pathname === '/pbs'}>Trophy Room</a>
+          <a href="/goals" class="nav-link" class:active={$page.url.pathname === '/goals'}>Goals</a>
           <a href="/bibs" class="nav-link" class:active={$page.url.pathname === '/bibs'}>Bibs</a>
           <a href="/theme" class="nav-link" class:active={$page.url.pathname === '/theme'}>Theme</a>
         </div>
@@ -56,6 +57,10 @@
     <a href="/bibs" class:active={$page.url.pathname === '/bibs'}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
       Bibs
+    </a>
+    <a href="/goals" class:active={$page.url.pathname === '/goals'}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      Goals
     </a>
     <a href="/theme" class:active={$page.url.pathname === '/theme'}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="0.5" fill="currentColor"/><circle cx="17.5" cy="10.5" r="0.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="0.5" fill="currentColor"/><circle cx="6.5" cy="12.5" r="0.5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>

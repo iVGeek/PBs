@@ -190,29 +190,139 @@
     await loadAll();
   }
 
-  function exportData() {
-    const rows = medals.map((m: any) => ({
-      type: 'medal',
-      name: m.raceName,
-      date: m.eventDate,
-      distance: m.distance,
-      time_seconds: m.timeSeconds,
-      place: m.place ?? '',
-      notes: m.notes ?? '',
+  function exportData(format: 'json' | 'csv') {
+    const medalRows = medals.map((m: any) => ({
+      type: 'medal', name: m.raceName, date: new Date(m.eventDate).toISOString().slice(0, 10),
+      distance: m.distance, time: secondsToTime(m.timeSeconds), place: m.place ?? '', notes: m.notes ?? '',
     }));
     for (const b of bibs) {
-      rows.push({ type: 'bib', name: b.eventName, date: b.eventDate, distance: b.distance ?? '', time_seconds: '', place: `#${b.bibNumber}`, notes: b.notes ?? '' });
+      medalRows.push({ type: 'bib', name: b.eventName, date: new Date(b.eventDate).toISOString().slice(0, 10), distance: b.distance || '', time: '', place: `#${b.bibNumber}`, notes: b.notes || '' });
     }
-    if (rows.length === 0) { errorMsg = 'Nothing to export yet.'; return; }
-    const json = JSON.stringify(rows, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
+    if (medalRows.length === 0) { errorMsg = 'Nothing to export yet.'; return; }
+    let content: string;
+    let mime: string;
+    let ext: string;
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (format === 'csv') {
+      const header = 'type,name,date,distance,time,place,notes';
+      const lines = medalRows.map((r: any) =>
+        [r.type, r.name, r.date, r.distance, r.time, r.place, r.notes]
+          .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
+      );
+      content = [header, ...lines].join('\n');
+      mime = 'text/csv';
+      ext = 'csv';
+    } else {
+      content = JSON.stringify(medalRows, null, 2);
+      mime = 'application/json';
+      ext = 'json';
+    }
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `racewall-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `racewall-export-${stamp}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
-    importSuccess = `Exported ${rows.length} record${rows.length !== 1 ? 's' : ''}.`;
+    importSuccess = `Exported ${medalRows.length} record${medalRows.length !== 1 ? 's' : ''} as ${ext.toUpperCase()}.`;
+  }
+
+  async function shareWall() {
+    const text = `🏆 RaceWall — ${medals.length} race${medals.length !== 1 ? 's' : ''}, ${totalDist.toFixed(1)} km raced, ${pbs.size} PB${pbs.size !== 1 ? 's' : ''}, ${bibs.length} bib${bibs.length !== 1 ? 's' : ''}!`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'My RaceWall', text });
+        importSuccess = 'Shared!';
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        importSuccess = 'Summary copied to clipboard.';
+      } else {
+        errorMsg = 'Sharing not supported on this device.';
+      }
+    } catch {
+      errorMsg = 'Sharing cancelled.';
+    }
+  }
+
+  function parseCsv(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let field = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else if (c === '"') {
+        inQuotes = true;
+      } else if (c === ',') {
+        row.push(field); field = '';
+      } else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); field = '';
+        if (row.some((v) => v.trim() !== '')) rows.push(row);
+        row = [];
+      } else {
+        field += c;
+      }
+    }
+    row.push(field);
+    if (row.some((v) => v.trim() !== '')) rows.push(row);
+    return rows;
+  }
+
+  async function handleCsvImport(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    errorMsg = ''; importSuccess = '';
+    const text = await file.text();
+    const rows = parseCsv(text);
+    if (rows.length < 2) { errorMsg = 'CSV must have a header row and at least one data row.'; input.value = ''; return; }
+    const header = rows[0].map((h) => h.trim().toLowerCase());
+    const data = rows.slice(1);
+    const idx: Record<string, number> = {};
+    header.forEach((h, i) => { const key = h.replace(/\s+/g, '_'); if (!(key in idx)) idx[key] = i; });
+    const nameMap: Record<string, string> = { 'race name': 'raceName', name: 'raceName', race: 'raceName' };
+    const dateMap: Record<string, string> = { date: 'eventDate', event_date: 'eventDate' };
+    const distMapH: Record<string, string> = { distance: 'distance', dist: 'distance' };
+    const timeMap: Record<string, string> = { time: 'time' };
+    let imported = 0;
+    let skipped = 0;
+    for (const r of data) {
+      const get = (keys: string[]) => { for (const k of keys) if (idx[k] !== undefined && r[idx[k]] !== undefined && r[idx[k]].trim()) return r[idx[k]].trim(); return ''; };
+      const raceName = get(['raceName', 'race_name', 'name', 'race']);
+      if (!raceName) { skipped++; continue; }
+      const dateStr = get(['eventDate', 'event_date', 'date']);
+      let eventDate = dateStr;
+      if (eventDate && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(eventDate)) {
+        const [mm, dd, yyyy] = eventDate.split('/');
+        eventDate = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+      }
+      if (!eventDate) { skipped++; continue; }
+      let distance = get(['distance', 'dist']);
+      if (!distance || !distanceOptions.includes(distance)) distance = '5K';
+      const timeStr = get(['time_seconds', 'time']);
+      let timeSeconds = 0;
+      if (/^\d+$/.test(timeStr)) timeSeconds = parseInt(timeStr);
+      else {
+        const t = timeStr.split(':');
+        if (t.length === 3) timeSeconds = parseInt(t[0]) * 3600 + parseInt(t[1]) * 60 + parseInt(t[2]);
+        else if (t.length === 2) timeSeconds = parseInt(t[0]) * 60 + parseInt(t[1]);
+      }
+      const res = await fetch('/api/medals', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raceName, eventDate, distance, timeSeconds, place: null }),
+      });
+      if (res.ok) imported++; else skipped++;
+    }
+    input.value = '';
+    await loadAll();
+    if (imported > 0) importSuccess = `Imported ${imported} race${imported !== 1 ? 's' : ''}${skipped ? ` · ${skipped} skipped` : ''}.`;
+    else errorMsg = 'No new races imported from CSV.';
   }
 
   function categorizeDistance(km: number): string {
@@ -229,6 +339,7 @@
   let importProgress = $state(0);
   let importTotal = $state(0);
   let importSuccess = $state('');
+  let exportOpen = $state(false);
 
   async function importFromStrava() {
     importing = true; errorMsg = ''; importProgress = 0; importTotal = 0;
@@ -371,10 +482,28 @@
         Importing
       {:else}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-        Import
+        Strava
       {/if}
     </button>
-    <button class="btn btn-ghost btn-sm" onclick={exportData}>Export</button>
+    <button class="btn btn-ghost btn-sm" onclick={shareWall}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+      Share
+    </button>
+    <div class="relative">
+      <button class="btn btn-ghost btn-sm" onclick={() => exportOpen = !exportOpen}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Export
+      </button>
+      {#if exportOpen}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div class="absolute right-0 mt-1 z-30 rounded-lg overflow-hidden" style="background: var(--surface-3); border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.4); min-width: 150px;" onclick={() => exportOpen = false}>
+          <button class="block w-full text-left px-4 py-2 text-sm hover:opacity-80" style="cursor: pointer;" onclick={() => exportData('json')}>Export JSON</button>
+          <button class="block w-full text-left px-4 py-2 text-sm hover:opacity-80" style="cursor: pointer;" onclick={() => exportData('csv')}>Export CSV</button>
+          <button class="block w-full text-left px-4 py-2 text-sm hover:opacity-80" style="cursor: pointer;" onclick={() => window.document.getElementById('csv-input')?.click()}>Import CSV…</button>
+        </div>
+      {/if}
+    </div>
+    <input id="csv-input" type="file" accept=".csv,text/csv" onchange={handleCsvImport} style="display: none;" />
     <button class="btn btn-secondary btn-sm" onclick={() => showBibForm = true}>+ Bib</button>
     <button class="btn btn-primary btn-sm" onclick={() => showMedalForm = true}>+ Medal</button>
   </div>

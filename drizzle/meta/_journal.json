@@ -15,6 +15,13 @@
       "when": 1788480831236,
       "tag": "0001_luxuriant_risque",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788481832649,
+      "tag": "0002_blue_spectrum",
+      "breakpoints": true
     }
   ]
 }
