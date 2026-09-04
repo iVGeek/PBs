@@ -48,6 +48,19 @@
 
   let compareResult = $derived(compareMedals());
 
+  let comparePace = $derived(() => {
+    if (!compareResult.left || !compareResult.right) return null;
+    const l = compareResult.left;
+    const r = compareResult.right;
+    const lKm = distanceKm[l.distance] || 21.097;
+    const rKm = distanceKm[r.distance] || 21.097;
+    const lPace = l.timeSeconds / lKm;
+    const rPace = r.timeSeconds / rKm;
+    return { lPace, rPace, sameDist: l.distance === r.distance };
+  });
+
+  let comparePaceRes = $derived(comparePace());
+
   async function loadAll() {
     const res = await fetch('/api/medals');
     if (res.ok) medals = await res.json();
@@ -126,15 +139,21 @@
 {:else if activeTab === 'progression'}
   {#if progression.length > 0}
     <div class="space-y-6 stagger">
-      {#each progression as p (p.distance)}
-        {@const maxT = maxTime(p.entries)}
-        {@const minT = minTime(p.entries)}
-        {@const range = maxT - minT || 1}
+        {#each progression as p (p.distance)}
+          {@const maxT = maxTime(p.entries)}
+          {@const minT = minTime(p.entries)}
+          {@const range = maxT - minT || 1}
+          {@const first = p.entries[0].time}
+          {@const latest = p.entries[p.entries.length - 1].time}
+          {@const improv = first - latest}
+          {@const pct = first > 0 ? Math.round((improv / first) * 100) : 0}
         <div class="card">
           <div class="flex items-center gap-2 mb-3">
             <span class="text-lg">{distEmoji[p.distance] || '🏅'}</span>
             <h3 class="font-bold">{distMap[p.distance] || p.distance}</h3>
             <span class="badge text-[10px]">{p.entries.length} races</span>
+            <span class="ml-auto text-[11px] font-semibold tabular-nums" style="color: {pct > 0 ? '#34d399' : pct < 0 ? '#f87171' : 'var(--text-secondary)'};">
+              {pct > 0 ? '▼' : pct < 0 ? '▲' : '•'} {Math.abs(pct)}% {pct >= 0 ? 'faster' : 'slower'}</span>
           </div>
           <div class="space-y-1.5">
             {#each p.entries as e, i (i)}
@@ -188,6 +207,15 @@
     {@const l = compareResult.left}
     {@const r = compareResult.right}
     {@const diff = r.timeSeconds - l.timeSeconds}
+    {@const sameDist = l.distance === r.distance}
+    {@const paceDiff = comparePaceRes ? comparePaceRes.rPace - comparePaceRes.lPace : 0}
+
+    {#if !sameDist}
+      <div class="rounded-xl mb-4 px-4 py-3 text-xs font-medium" style="background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2); color: #fbbf24;">
+        ⚠️ These are different distances ({distMap[l.distance] || l.distance} vs {distMap[r.distance] || r.distance}) — comparing total time is misleading. Compare pace instead.
+      </div>
+    {/if}
+
     <div class="grid grid-cols-3 gap-3">
       <div class="card text-center">
         <div class="text-xs font-bold mb-2" style="color: var(--accent);">Left</div>
@@ -199,10 +227,17 @@
         {#if l.place != null}<div class="text-xs mt-1" style="color: var(--accent);">#{l.place}</div>{/if}
       </div>
       <div class="card text-center flex flex-col items-center justify-center">
-        <div class="text-2xl mb-1">{diff < 0 ? '🏎️' : diff > 0 ? '🐌' : '🤝'}</div>
-        <div class="text-xs font-bold" style="color: {diff < 0 ? '#34d399' : diff > 0 ? '#f87171' : 'var(--text-secondary)'};">
-          {diff === 0 ? 'Same time!' : (diff < 0 ? 'Faster by ' : 'Slower by ') + secondsToTime(Math.abs(diff))}
+        <div class="text-2xl mb-1">{sameDist ? (diff < 0 ? '🏎️' : diff > 0 ? '🐌' : '🤝') : (paceDiff < 0 ? '🏎️' : paceDiff > 0 ? '🐌' : '🤝')}</div>
+        <div class="text-xs font-bold" style="color: {sameDist ? (diff < 0 ? '#34d399' : diff > 0 ? '#f87171' : 'var(--text-secondary)') : (paceDiff < 0 ? '#34d399' : paceDiff > 0 ? '#f87171' : 'var(--text-secondary)')};">
+          {#if sameDist}
+            {diff === 0 ? 'Same time!' : (diff < 0 ? 'Faster by ' : 'Slower by ') + secondsToTime(Math.abs(diff))}
+          {:else}
+            {paceDiff === 0 ? 'Same pace!' : (paceDiff < 0 ? 'Faster by ' : 'Slower by ') + secondsToPace(Math.abs(Math.round(paceDiff)))}/km
+          {/if}
         </div>
+        {#if !sameDist}
+          <div class="text-[10px] mt-1" style="color: var(--text-secondary);">pace comparison</div>
+        {/if}
       </div>
       <div class="card text-center">
         <div class="text-xs font-bold mb-2" style="color: var(--accent);">Right</div>

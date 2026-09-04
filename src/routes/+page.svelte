@@ -114,6 +114,7 @@
       if (res.ok) {
         showMedalForm = false; editingMedalId = null;
         photoPreview = ''; photoUrl = '';
+        showToast('Medal updated.');
         await loadAll();
       }
       return;
@@ -125,6 +126,7 @@
     if (res.ok) {
       showMedalForm = false;
       raceName = ''; eventDate = ''; distance = '5K'; hours = 0; minutes = 0; seconds = 0; place = null; photoUrl = ''; photoPreview = ''; notes = '';
+      showToast('Medal added to your wall.');
       await loadAll();
     }
   }
@@ -152,7 +154,7 @@
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: editingBibId, bibNumber: bibNumber.trim(), eventName: bibEventName.trim(), eventDate: bibEventDate, distance: bibDistance || null, photoUrl: bibPhotoUrl || null, notes: bibNotes || null }),
       });
-      if (res.ok) { showBibForm = false; editingBibId = null; bibPhotoPreview = ''; bibPhotoUrl = ''; await loadAll(); }
+      if (res.ok) { showBibForm = false; editingBibId = null; bibPhotoPreview = ''; bibPhotoUrl = ''; showToast('Bib updated.'); await loadAll(); }
       return;
     }
     const res = await fetch('/api/bibs', {
@@ -162,6 +164,7 @@
     if (res.ok) {
       showBibForm = false;
       bibNumber = ''; bibEventName = ''; bibEventDate = ''; bibDistance = ''; bibNotes = ''; bibPhotoUrl = ''; bibPhotoPreview = '';
+      showToast('Bib added to your collection.');
       await loadAll();
     }
   }
@@ -178,15 +181,32 @@
     showBibForm = true;
   }
 
-  async function deleteMedal(id: string) {
-    if (!confirm('Delete this medal? This cannot be undone.')) return;
-    await fetch(`/api/medals?id=${id}`, { method: 'DELETE' });
-    await loadAll();
+  function requestDeleteMedal(id: string) {
+    confirmDeleteId = id;
+    confirmDeleteType = 'medal';
   }
 
-  async function deleteBib(id: string) {
-    if (!confirm('Remove this bib? This cannot be undone.')) return;
-    await fetch(`/api/bibs?id=${id}`, { method: 'DELETE' });
+  function requestDeleteBib(id: string) {
+    confirmDeleteId = id;
+    confirmDeleteType = 'bib';
+  }
+
+  function cancelDelete() {
+    confirmDeleteId = '';
+    deleting = false;
+  }
+
+  async function confirmDelete() {
+    if (!confirmDeleteId) return;
+    deleting = true;
+    const url = confirmDeleteType === 'medal'
+      ? `/api/medals?id=${confirmDeleteId}`
+      : `/api/bibs?id=${confirmDeleteId}`;
+    await fetch(url, { method: 'DELETE' });
+    const name = confirmDeleteType === 'medal' ? 'Medal' : 'Bib';
+    showToast(`${name} deleted.`);
+    confirmDeleteId = '';
+    deleting = false;
     await loadAll();
   }
 
@@ -340,6 +360,15 @@
   let importTotal = $state(0);
   let importSuccess = $state('');
   let exportOpen = $state(false);
+  let toast = $state('');
+  let confirmDeleteId = $state('');
+  let confirmDeleteType = $state<'medal' | 'bib'>('medal');
+  let deleting = $state(false);
+
+  function showToast(msg: string) {
+    toast = msg;
+    setTimeout(() => { if (toast === msg) toast = ''; }, 3500);
+  }
 
   async function importFromStrava() {
     importing = true; errorMsg = ''; importProgress = 0; importTotal = 0;
@@ -413,6 +442,13 @@
 {#if importSuccess}
   <div class="rounded-xl mb-6 px-4 py-3 text-sm font-medium" style="background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: #4ade80;">
     {importSuccess}
+  </div>
+{/if}
+
+<!-- Toast -->
+{#if toast}
+  <div class="toast">
+    {toast}
   </div>
 {/if}
 
@@ -575,11 +611,14 @@
                   <span>#{medal.place}</span>
                 {/if}
               </div>
+              {#if medal.notes}
+                <div class="text-[10px] text-white/50 mt-0.5 truncate">📝 {medal.notes}</div>
+              {/if}
               <div class="flex items-center justify-between mt-0.5">
                 <span class="text-[10px] text-white/40">{new Date(medal.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 <div class="flex items-center gap-1.5">
                   <button class="text-white/30 hover:text-white transition-colors text-xs" onclick={(e) => { e.stopPropagation(); openEditMedal(medal); }} style="background: none; border: none; cursor: pointer; padding: 2px;" aria-label="Edit medal">✎</button>
-                  <button class="text-white/30 hover:text-red-400 transition-colors text-xs" onclick={(e) => { e.stopPropagation(); deleteMedal(medal.id); }} style="background: none; border: none; cursor: pointer; padding: 2px;" aria-label="Delete medal">✕</button>
+                  <button class="text-white/30 hover:text-red-400 transition-colors text-xs" onclick={(e) => { e.stopPropagation(); requestDeleteMedal(medal.id); }} style="background: none; border: none; cursor: pointer; padding: 2px;" aria-label="Delete medal">✕</button>
                 </div>
               </div>
             </div>
@@ -728,6 +767,27 @@
       <div class="flex gap-3 mt-6">
         <button class="btn btn-secondary flex-1" onclick={() => { showBibForm = false; editingBibId = null; }}>Cancel</button>
         <button class="btn btn-primary flex-1" onclick={addBib} disabled={!bibNumber.trim() || !bibEventName.trim() || !bibEventDate}>{editingBibId ? 'Save Changes' : 'Save Bib'}</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Confirm Delete -->
+{#if confirmDeleteId}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="modal-overlay" onclick={cancelDelete}>
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="modal-content max-w-sm" onclick={(e) => e.stopPropagation()}>
+      <div class="text-center px-2 py-4">
+        <div class="text-4xl mb-3">{confirmDeleteType === 'medal' ? '🏅' : '🎫'}</div>
+        <h2 class="text-lg font-bold mb-1">Delete this {confirmDeleteType}?</h2>
+        <p class="text-sm mb-6" style="color: var(--text-secondary);">This action cannot be undone.</p>
+        <div class="flex gap-3">
+          <button class="btn btn-secondary flex-1" onclick={cancelDelete} disabled={deleting}>Cancel</button>
+          <button class="btn flex-1" style="background: #dc2626; color: #fff;" onclick={confirmDelete} disabled={deleting}>
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
       </div>
     </div>
   </div>

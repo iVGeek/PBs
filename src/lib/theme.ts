@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 
 const THEME_KEY = 'mh_theme';
 const FONT_KEY = 'mh_font';
+const ACCENT_KEY = 'mh_accent';
 
 export const themes = [
   { name: 'Obsidian', bodyClass: 'theme-obsidian', accent: '#a78bfa' },
@@ -67,4 +68,28 @@ export function setFont(font: (typeof fonts)[number]) {
   if (!browser) return;
   localStorage.setItem(FONT_KEY, JSON.stringify(font));
   document.body.style.setProperty('--font-family', font.value);
+}
+
+export function getAccent(): string {
+  if (!browser) return '';
+  return localStorage.getItem(ACCENT_KEY) || '';
+}
+
+export function setAccent(hex: string): void {
+  if (!browser) return;
+  localStorage.setItem(ACCENT_KEY, hex);
+  applyAccent(hex);
+}
+
+export function applyAccent(hex: string): void {
+  document.body.style.setProperty('--accent', hex);
+  document.body.style.setProperty('--accent-hover', hex + 'dd');
+  document.body.style.setProperty('--accent-light', hex + '1a');
+}
+
+export function resetAccent(): void {
+  if (!browser) return;
+  localStorage.removeItem(ACCENT_KEY);
+  const theme = getTheme();
+  applyAccent(theme.accent);
 }

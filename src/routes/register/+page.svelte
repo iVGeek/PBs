@@ -1,22 +1,31 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { applyTheme, themes } from '$lib/theme';
+  import { applyTheme, themes, setTheme } from '$lib/theme';
   import { goto } from '$app/navigation';
+  import { getTheme } from '$lib/theme';
 
   let step = $state(1);
   let name = $state($page.data.user?.name || '');
   let avatar = $state($page.data.user?.avatar || '');
   let bio = $state($page.data.user?.bio || '');
   let units = $state($page.data.user?.units || 'km');
-  let selectedTheme = $state(themes[0]);
+  let selectedTheme = $state(getTheme());
+  let formError = $state('');
 
-  function next() { if (step < 5) { step++; if (step === 5) applyTheme(); } }
+  function next() {
+    if (step === 1 && name.trim().length < 2) { formError = 'Please enter your name (at least 2 characters).'; return; }
+    formError = '';
+    if (step === 5) setTheme(selectedTheme);
+    if (step < 5) { step++; if (step === 5) applyTheme(); }
+  }
   function prev() { if (step > 1) step--; }
 
   async function finish() {
+    if (name.trim().length < 2) { formError = 'Please enter your name (at least 2 characters).'; step = 1; return; }
+    setTheme(selectedTheme);
     const res = await fetch('/api/user/onboard', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, avatar, bio, units, theme: selectedTheme.bodyClass }),
+      body: JSON.stringify({ name: name.trim(), avatar, bio, units, theme: selectedTheme.bodyClass }),
     });
     if (res.ok) goto('/payment');
   }
@@ -34,6 +43,12 @@
         <div class="h-1 rounded-full transition-all duration-300" style="width: {i + 1 === step ? '2rem' : '1rem'}; background: {i < step ? 'var(--accent)' : 'var(--border)'};"></div>
       {/each}
     </div>
+
+    {#if formError}
+      <div class="rounded-xl mb-4 px-4 py-2 text-xs font-medium text-center" style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #f87171;">
+        {formError}
+      </div>
+    {/if}
 
     {#if step === 1}
       <div class="text-center">
@@ -69,7 +84,7 @@
         <h2 class="text-xl font-bold mb-4">Choose your theme</h2>
         <div class="grid grid-cols-3 gap-2 mt-4">
           {#each themes as t}
-            <button class="rounded-lg p-3 text-xs font-medium transition-all" style="background: {t.bodyClass === selectedTheme.bodyClass ? 'var(--accent)' : 'var(--surface-3)'}; color: {t.bodyClass === selectedTheme.bodyClass ? '#000' : 'var(--text-primary)'}; border: 1px solid {t.bodyClass === selectedTheme.bodyClass ? 'var(--accent)' : 'var(--border)'}; cursor: pointer;" onclick={() => { selectedTheme = t; localStorage.setItem('mh_theme', JSON.stringify(t)); applyTheme(); }}>
+            <button class="rounded-lg p-3 text-xs font-medium transition-all" style="background: {t.bodyClass === selectedTheme.bodyClass ? 'var(--accent)' : 'var(--surface-3)'}; color: {t.bodyClass === selectedTheme.bodyClass ? '#000' : 'var(--text-primary)'}; border: 1px solid {t.bodyClass === selectedTheme.bodyClass ? 'var(--accent)' : 'var(--border)'}; cursor: pointer;" onclick={() => { selectedTheme = t; setTheme(t); }}>
               <div class="w-full h-1 rounded-full mb-1.5" style="background: {t.accent};"></div>
               {t.name}
             </button>

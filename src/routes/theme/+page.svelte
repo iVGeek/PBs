@@ -1,13 +1,20 @@
 <script lang="ts">
-  import { applyTheme, setTheme, getTheme, themes, fonts, setFont, getFont } from '$lib/theme';
+  import { onMount } from 'svelte';
+  import { setTheme, getTheme, themes, fonts, setFont, getFont, getAccent, setAccent, resetAccent } from '$lib/theme';
 
   let currentTheme = $state(getTheme());
   let currentFont = $state(getFont());
-  let customColor = $state('');
+  let customColor = $state(getAccent());
+
+  onMount(() => {
+    const saved = getAccent();
+    if (saved) applyCustomColor();
+  });
 
   function selectTheme(t: typeof themes[number]) {
     currentTheme = t;
     setTheme(t);
+    if (!getAccent()) setAccent(t.accent);
   }
 
   function selectFont(f: typeof fonts[number]) {
@@ -16,11 +23,12 @@
   }
 
   function applyCustomColor() {
-    if (customColor) {
-      document.body.style.setProperty('--accent', customColor);
-      document.body.style.setProperty('--accent-hover', customColor + 'dd');
-      document.body.style.setProperty('--accent-light', customColor + '1a');
-    }
+    if (customColor) setAccent(customColor);
+  }
+
+  function doReset() {
+    customColor = '';
+    resetAccent();
   }
 </script>
 
@@ -60,13 +68,17 @@
   <div class="flex gap-3 items-end">
     <div class="flex-1">
       <label class="label" for="custom-hex">Hex color (e.g. #ff6b6b)</label>
-      <input id="custom-hex" class="input" bind:value={customColor} placeholder="#a78bfa" />
+      <input id="custom-hex" class="input" bind:value={customColor} placeholder="#a78bfa" oninput={(e) => { customColor = (e.target as HTMLInputElement).value; }} />
     </div>
     <button class="btn btn-primary" onclick={applyCustomColor}>Apply</button>
+    <button class="btn btn-secondary" onclick={doReset}>Reset</button>
   </div>
-  <div class="flex gap-2 mt-3">
+  <div class="flex gap-2 mt-3 flex-wrap items-center">
     {#each ['#ff6b6b', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#01a3a4', '#f368e0', '#ee5a24', '#00d2d3', '#feca57'] as color}
-      <button class="w-9 h-9 rounded-full border-2 transition-transform hover:scale-110" style="background: {color}; border-color: {color === currentTheme.accent ? 'var(--accent)' : 'transparent'}; cursor: pointer;" onclick={() => { customColor = color; applyCustomColor(); }} aria-label="Color {color}"></button>
+      <button class="w-9 h-9 rounded-full border-2 transition-transform hover:scale-110" style="background: {color}; border-color: {color.toLowerCase() === customColor.toLowerCase() ? 'var(--accent)' : 'transparent'}; cursor: pointer;" onclick={() => { customColor = color; setAccent(color); }} aria-label="Color {color}"></button>
     {/each}
+    {#if customColor}
+      <span class="text-[11px]" style="color: var(--text-secondary);">Active: <span style="color: {customColor};">{customColor}</span></span>
+    {/if}
   </div>
 </div>
