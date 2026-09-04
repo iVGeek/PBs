@@ -39,6 +39,9 @@
   let bibPhotoUrl = $state('');
   let bibPhotoPreview = $state('');
 
+  let editingMedalId = $state<string | null>(null);
+  let editingBibId = $state<string | null>(null);
+
   let years = $derived(getYears(medals));
   let filtered = $derived(filterMedals(medals, searchQuery, distFilter, yearFilter));
   let timeline = $derived(timelineGroups(filtered));
@@ -55,27 +58,66 @@
 
   onMount(loadAll);
 
+  function readImage(file: File): Promise<string> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1200;
+          let { width, height } = img;
+          const scale = Math.min(1, MAX / Math.max(width, height));
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { resolve(reader.result as string); return; }
+          ctx.drawImage(img, 0, 0, width, height);
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            resolve(dataUrl);
+          } catch {
+            resolve(reader.result as string);
+          }
+        };
+        img.onerror = () => resolve(reader.result as string);
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   function handleMedalPhoto(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { const r = reader.result as string; photoUrl = r; photoPreview = r; };
-    reader.readAsDataURL(file);
+    readImage(file).then((r) => { photoUrl = r; photoPreview = r; });
   }
 
   function handleBibPhoto(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { const r = reader.result as string; bibPhotoUrl = r; bibPhotoPreview = r; };
-    reader.readAsDataURL(file);
+    readImage(file).then((r) => { bibPhotoUrl = r; bibPhotoPreview = r; });
   }
 
   async function addMedal() {
     if (!raceName.trim() || !eventDate) return;
     const timeSeconds = hours * 3600 + minutes * 60 + seconds;
+    if (editingMedalId) {
+      const res = await fetch('/api/medals', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingMedalId, raceName: raceName.trim(), eventDate, distance, timeSeconds, place, photoUrl: photoUrl || null, notes: notes || null }),
+      });
+      if (res.ok) {
+        showMedalForm = false; editingMedalId = null;
+        photoPreview = ''; photoUrl = '';
+        await loadAll();
+      }
+      return;
+    }
     const res = await fetch('/api/medals', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ raceName: raceName.trim(), eventDate, distance, timeSeconds, place, photoUrl: photoUrl || undefined, notes: notes || undefined }),
@@ -87,8 +129,32 @@
     }
   }
 
+  function openEditMedal(m: any) {
+    editingMedalId = m.id;
+    raceName = m.raceName;
+    eventDate = new Date(m.eventDate).toISOString().slice(0, 10);
+    distance = m.distance;
+    const secs = Number(m.timeSeconds) || 0;
+    hours = Math.floor(secs / 3600);
+    minutes = Math.floor((secs % 3600) / 60);
+    seconds = secs % 60;
+    place = m.place ?? null;
+    photoUrl = m.photoUrl || '';
+    photoPreview = m.photoUrl || '';
+    notes = m.notes || '';
+    showMedalForm = true;
+  }
+
   async function addBib() {
     if (!bibNumber.trim() || !bibEventName.trim() || !bibEventDate) return;
+    if (editingBibId) {
+      const res = await fetch('/api/bibs', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingBibId, bibNumber: bibNumber.trim(), eventName: bibEventName.trim(), eventDate: bibEventDate, distance: bibDistance || null, photoUrl: bibPhotoUrl || null, notes: bibNotes || null }),
+      });
+      if (res.ok) { showBibForm = false; editingBibId = null; bibPhotoPreview = ''; bibPhotoUrl = ''; await loadAll(); }
+      return;
+    }
     const res = await fetch('/api/bibs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bibNumber: bibNumber.trim(), eventName: bibEventName.trim(), eventDate: bibEventDate, distance: bibDistance || undefined, photoUrl: bibPhotoUrl || undefined, notes: bibNotes || undefined }),
@@ -100,14 +166,53 @@
     }
   }
 
+  function openEditBib(b: any) {
+    editingBibId = b.id;
+    bibNumber = b.bibNumber;
+    bibEventName = b.eventName;
+    bibEventDate = new Date(b.eventDate).toISOString().slice(0, 10);
+    bibDistance = b.distance || '';
+    bibNotes = b.notes || '';
+    bibPhotoUrl = b.photoUrl || '';
+    bibPhotoPreview = b.photoUrl || '';
+    showBibForm = true;
+  }
+
   async function deleteMedal(id: string) {
+    if (!confirm('Delete this medal? This cannot be undone.')) return;
     await fetch(`/api/medals?id=${id}`, { method: 'DELETE' });
     await loadAll();
   }
 
   async function deleteBib(id: string) {
+    if (!confirm('Remove this bib? This cannot be undone.')) return;
     await fetch(`/api/bibs?id=${id}`, { method: 'DELETE' });
     await loadAll();
+  }
+
+  function exportData() {
+    const rows = medals.map((m: any) => ({
+      type: 'medal',
+      name: m.raceName,
+      date: m.eventDate,
+      distance: m.distance,
+      time_seconds: m.timeSeconds,
+      place: m.place ?? '',
+      notes: m.notes ?? '',
+    }));
+    for (const b of bibs) {
+      rows.push({ type: 'bib', name: b.eventName, date: b.eventDate, distance: b.distance ?? '', time_seconds: '', place: `#${b.bibNumber}`, notes: b.notes ?? '' });
+    }
+    if (rows.length === 0) { errorMsg = 'Nothing to export yet.'; return; }
+    const json = JSON.stringify(rows, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `racewall-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    importSuccess = `Exported ${rows.length} record${rows.length !== 1 ? 's' : ''}.`;
   }
 
   function categorizeDistance(km: number): string {
@@ -121,8 +226,12 @@
     return km.toFixed(2) + ' km';
   }
 
+  let importProgress = $state(0);
+  let importTotal = $state(0);
+  let importSuccess = $state('');
+
   async function importFromStrava() {
-    importing = true; errorMsg = '';
+    importing = true; errorMsg = ''; importProgress = 0; importTotal = 0;
     try {
       const res = await fetch('/api/strava/import');
       const data = await res.json();
@@ -131,25 +240,34 @@
       const runTypes = ['Run', 'TrailRun', 'VirtualRun'];
       const running = data.activities.filter((a: any) => runTypes.includes(a.type));
       if (running.length === 0) { errorMsg = 'No running activities found.'; importing = false; return; }
+      // Skip anything already imported (by Strava activity id, with name fallback for legacy rows)
+      const existingById = new Set(medals.map((m: any) => m.stravaActivityId).filter(Boolean));
+      const existingByName = new Set(medals.map((m: any) => m.raceName));
+      const toImport = running.filter((a: any) => !existingById.has(String(a.id)));
+      if (toImport.length === 0) { importing = false; errorMsg = 'Nothing new to import — your Strava races are already on the wall.'; await loadAll(); return; }
+      importTotal = toImport.length;
       let imported = 0;
-      for (const act of running) {
+      let skipped = 0;
+      for (const act of toImport) {
         const km = act.distance / 1000;
         const dist = categorizeDistance(km);
-        if (medals.some((m: any) => m.raceName === act.name)) continue;
+        if (existingByName.has(act.name)) { skipped++; importProgress++; continue; }
         const res2 = await fetch('/api/medals', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ raceName: act.name, eventDate: act.start_date, distance: dist, timeSeconds: Math.round(act.moving_time), place: null }),
+          body: JSON.stringify({ raceName: act.name, eventDate: act.start_date, distance: dist, timeSeconds: Math.round(act.moving_time), place: null, stravaActivityId: String(act.id) }),
         });
-        if (res2.ok) imported++;
+        if (res2.ok) imported++; else skipped++;
+        importProgress++;
       }
       await loadAll();
       importing = false;
-      if (imported > 0) errorMsg = ''; else errorMsg = 'No new races to import.';
+      errorMsg = '';
+      if (imported > 0) importSuccess = `Imported ${imported} race${imported !== 1 ? 's' : ''}${skipped ? ` · ${skipped} skipped` : ''}.`;
     } catch { importing = false; errorMsg = 'Network error. Please try again.'; }
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') { showMedalForm = false; showBibForm = false; lightboxPhoto = ''; }
+    if (e.key === 'Escape') { showMedalForm = false; showBibForm = false; lightboxPhoto = ''; editingMedalId = null; editingBibId = null; }
   }
 </script>
 
@@ -167,6 +285,26 @@
 {#if errorMsg}
   <div class="rounded-xl mb-6 px-4 py-3 text-sm font-medium" style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #f87171;">
     {errorMsg}
+  </div>
+{/if}
+
+<!-- Success -->
+{#if importSuccess}
+  <div class="rounded-xl mb-6 px-4 py-3 text-sm font-medium" style="background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: #4ade80;">
+    {importSuccess}
+  </div>
+{/if}
+
+<!-- Import progress -->
+{#if importing && importTotal > 0}
+  <div class="rounded-xl mb-6 px-4 py-3 text-sm font-medium" style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: #60a5fa;">
+    <div class="flex items-center justify-between mb-2">
+      <span>Importing races from Strava…</span>
+      <span class="tabular-nums">{importProgress} / {importTotal}</span>
+    </div>
+    <div class="h-1.5 rounded-full overflow-hidden" style="background: rgba(59,130,246,0.15);">
+      <div class="h-full transition-all duration-200" style="width: {importTotal ? (importProgress / importTotal) * 100 : 0}%; background: #3b82f6;"></div>
+    </div>
   </div>
 {/if}
 
@@ -193,6 +331,16 @@
       <div class="stat-value">{bibs.length}</div>
       <div class="stat-label mt-1">Bibs</div>
     </div>
+  </div>
+{:else}
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 stagger">
+    {#each [1, 2, 3, 4] as n (n)}
+      <div class="card" style="padding: 1.5rem 1rem;">
+        <div class="w-8 h-8 rounded-full mb-3 animate-pulse" style="background: var(--surface-3);"></div>
+        <div class="h-6 w-16 rounded mb-2 animate-pulse" style="background: var(--surface-3);"></div>
+        <div class="h-3 w-20 rounded animate-pulse" style="background: var(--surface-3);"></div>
+      </div>
+    {/each}
   </div>
 {/if}
 
@@ -226,6 +374,7 @@
         Import
       {/if}
     </button>
+    <button class="btn btn-ghost btn-sm" onclick={exportData}>Export</button>
     <button class="btn btn-secondary btn-sm" onclick={() => showBibForm = true}>+ Bib</button>
     <button class="btn btn-primary btn-sm" onclick={() => showMedalForm = true}>+ Medal</button>
   </div>
@@ -289,7 +438,10 @@
               </div>
               <div class="flex items-center justify-between mt-0.5">
                 <span class="text-[10px] text-white/40">{new Date(medal.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                <button class="text-white/30 hover:text-red-400 transition-colors text-xs" onclick={(e) => { e.stopPropagation(); deleteMedal(medal.id); }} style="background: none; border: none; cursor: pointer; padding: 2px;">✕</button>
+                <div class="flex items-center gap-1.5">
+                  <button class="text-white/30 hover:text-white transition-colors text-xs" onclick={(e) => { e.stopPropagation(); openEditMedal(medal); }} style="background: none; border: none; cursor: pointer; padding: 2px;" aria-label="Edit medal">✎</button>
+                  <button class="text-white/30 hover:text-red-400 transition-colors text-xs" onclick={(e) => { e.stopPropagation(); deleteMedal(medal.id); }} style="background: none; border: none; cursor: pointer; padding: 2px;" aria-label="Delete medal">✕</button>
+                </div>
               </div>
             </div>
           </div>
@@ -318,12 +470,12 @@
 <!-- Add Medal Modal -->
 {#if showMedalForm}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="modal-overlay" onclick={() => showMedalForm = false}>
+  <div class="modal-overlay" onclick={() => { showMedalForm = false; editingMedalId = null; }}>
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="flex items-center justify-between mb-5">
-        <h2 class="text-lg font-bold">Add Medal</h2>
-        <button class="btn-ghost" onclick={() => showMedalForm = false} style="border: none; background: none; cursor: pointer; color: var(--text-secondary);">
+        <h2 class="text-lg font-bold">{editingMedalId ? 'Edit Medal' : 'Add Medal'}</h2>
+        <button class="btn-ghost" onclick={() => { showMedalForm = false; editingMedalId = null; }} style="border: none; background: none; cursor: pointer; color: var(--text-secondary);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -375,8 +527,8 @@
         </div>
       </div>
       <div class="flex gap-3 mt-6">
-        <button class="btn btn-secondary flex-1" onclick={() => showMedalForm = false}>Cancel</button>
-        <button class="btn btn-primary flex-1" onclick={addMedal} disabled={!raceName.trim() || !eventDate}>Save Medal</button>
+        <button class="btn btn-secondary flex-1" onclick={() => { showMedalForm = false; editingMedalId = null; }}>Cancel</button>
+        <button class="btn btn-primary flex-1" onclick={addMedal} disabled={!raceName.trim() || !eventDate}>{editingMedalId ? 'Save Changes' : 'Save Medal'}</button>
       </div>
     </div>
   </div>
@@ -385,12 +537,12 @@
 <!-- Add Bib Modal -->
 {#if showBibForm}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="modal-overlay" onclick={() => showBibForm = false}>
+  <div class="modal-overlay" onclick={() => { showBibForm = false; editingBibId = null; }}>
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="flex items-center justify-between mb-5">
-        <h2 class="text-lg font-bold">Add Bib</h2>
-        <button class="btn-ghost" onclick={() => showBibForm = false} style="border: none; background: none; cursor: pointer; color: var(--text-secondary);">
+        <h2 class="text-lg font-bold">{editingBibId ? 'Edit Bib' : 'Add Bib'}</h2>
+        <button class="btn-ghost" onclick={() => { showBibForm = false; editingBibId = null; }} style="border: none; background: none; cursor: pointer; color: var(--text-secondary);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -435,8 +587,8 @@
         </div>
       </div>
       <div class="flex gap-3 mt-6">
-        <button class="btn btn-secondary flex-1" onclick={() => showBibForm = false}>Cancel</button>
-        <button class="btn btn-primary flex-1" onclick={addBib} disabled={!bibNumber.trim() || !bibEventName.trim() || !bibEventDate}>Save Bib</button>
+        <button class="btn btn-secondary flex-1" onclick={() => { showBibForm = false; editingBibId = null; }}>Cancel</button>
+        <button class="btn btn-primary flex-1" onclick={addBib} disabled={!bibNumber.trim() || !bibEventName.trim() || !bibEventDate}>{editingBibId ? 'Save Changes' : 'Save Bib'}</button>
       </div>
     </div>
   </div>

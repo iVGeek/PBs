@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { medals } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals }) => {
@@ -24,8 +24,28 @@ export const POST: RequestHandler = async ({ locals, request }) => {
     place: body.place ?? null,
     photoUrl: body.photoUrl ?? null,
     notes: body.notes ?? null,
+    stravaActivityId: body.stravaActivityId ?? null,
   }).returning();
   return json(medal, { status: 201 });
+};
+
+export const PUT: RequestHandler = async ({ locals, request }) => {
+  const { user } = locals;
+  if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
+  const body = await request.json();
+  const id = body.id;
+  if (!id) return json({ error: 'Missing id' }, { status: 400 });
+  const [medal] = await db.update(medals).set({
+    raceName: body.raceName,
+    eventDate: new Date(body.eventDate),
+    distance: body.distance,
+    timeSeconds: body.timeSeconds,
+    place: body.place ?? null,
+    photoUrl: body.photoUrl ?? null,
+    notes: body.notes ?? null,
+  }).where(and(eq(medals.id, id), eq(medals.userId, user.id))).returning();
+  if (!medal) return json({ error: 'Not found' }, { status: 404 });
+  return json(medal);
 };
 
 export const DELETE: RequestHandler = async ({ locals, url }) => {
@@ -33,6 +53,6 @@ export const DELETE: RequestHandler = async ({ locals, url }) => {
   if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
   const id = url.searchParams.get('id');
   if (!id) return json({ error: 'Missing id' }, { status: 400 });
-  await db.delete(medals).where(eq(medals.id, id));
+  await db.delete(medals).where(and(eq(medals.id, id), eq(medals.userId, user.id)));
   return json({ success: true });
 };

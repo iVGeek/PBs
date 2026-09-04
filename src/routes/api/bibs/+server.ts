@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { bibs } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals }) => {
@@ -27,11 +27,28 @@ export const POST: RequestHandler = async ({ locals, request }) => {
   return json(bib, { status: 201 });
 };
 
+export const PUT: RequestHandler = async ({ locals, request }) => {
+  const { user } = locals;
+  if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
+  const body = await request.json();
+  if (!body.id) return json({ error: 'Missing id' }, { status: 400 });
+  const [bib] = await db.update(bibs).set({
+    bibNumber: body.bibNumber,
+    eventName: body.eventName,
+    eventDate: new Date(body.eventDate),
+    distance: body.distance ?? null,
+    photoUrl: body.photoUrl ?? null,
+    notes: body.notes ?? null,
+  }).where(and(eq(bibs.id, body.id), eq(bibs.userId, user.id))).returning();
+  if (!bib) return json({ error: 'Not found' }, { status: 404 });
+  return json(bib);
+};
+
 export const DELETE: RequestHandler = async ({ locals, url }) => {
   const { user } = locals;
   if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
   const id = url.searchParams.get('id');
   if (!id) return json({ error: 'Missing id' }, { status: 400 });
-  await db.delete(bibs).where(eq(bibs.id, id));
+  await db.delete(bibs).where(and(eq(bibs.id, id), eq(bibs.userId, user.id)));
   return json({ success: true });
 };

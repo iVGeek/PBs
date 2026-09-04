@@ -1,0 +1,1 @@
+ALTER TABLE "medals" ADD COLUMN "strava_activity_id" text;

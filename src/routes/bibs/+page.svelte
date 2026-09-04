@@ -14,6 +14,7 @@
   let notes = $state('');
   let photoUrl = $state('');
   let photoPreview = $state('');
+  let editingId = $state<string | null>(null);
 
   async function loadBibs() {
     const res = await fetch('/api/bibs');
@@ -26,13 +27,50 @@
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { const r = reader.result as string; photoUrl = r; photoPreview = r; };
-    reader.readAsDataURL(file);
+    readImage(file).then((r) => { photoUrl = r; photoPreview = r; });
+  }
+
+  function readImage(file: File): Promise<string> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1200;
+          let { width, height } = img;
+          const scale = Math.min(1, MAX / Math.max(width, height));
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { resolve(reader.result as string); return; }
+          ctx.drawImage(img, 0, 0, width, height);
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            resolve(dataUrl);
+          } catch {
+            resolve(reader.result as string);
+          }
+        };
+        img.onerror = () => resolve(reader.result as string);
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   async function addBib() {
     if (!bibNumber.trim() || !eventName.trim() || !eventDate) return;
+    if (editingId) {
+      const res = await fetch('/api/bibs', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingId, bibNumber: bibNumber.trim(), eventName: eventName.trim(), eventDate, distance: distance || null, photoUrl: photoUrl || null, notes: notes || null }),
+      });
+      if (res.ok) { showForm = false; editingId = null; photoPreview = ''; photoUrl = ''; await loadBibs(); }
+      return;
+    }
     const res = await fetch('/api/bibs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bibNumber: bibNumber.trim(), eventName: eventName.trim(), eventDate, distance: distance || undefined, photoUrl: photoUrl || undefined, notes: notes || undefined }),
@@ -44,13 +82,26 @@
     }
   }
 
+  function openEdit(bib: any) {
+    editingId = bib.id;
+    bibNumber = bib.bibNumber;
+    eventName = bib.eventName;
+    eventDate = new Date(bib.eventDate).toISOString().slice(0, 10);
+    distance = bib.distance || '';
+    notes = bib.notes || '';
+    photoUrl = bib.photoUrl || '';
+    photoPreview = bib.photoUrl || '';
+    showForm = true;
+  }
+
   async function deleteBib(id: string) {
+    if (!confirm('Remove this bib? This cannot be undone.')) return;
     await fetch(`/api/bibs?id=${id}`, { method: 'DELETE' });
     await loadBibs();
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') { showForm = false; lightboxPhoto = ''; }
+    if (e.key === 'Escape') { showForm = false; lightboxPhoto = ''; editingId = null; }
   }
 </script>
 
@@ -103,7 +154,8 @@
           {#if bib.notes}
             <p class="text-xs mt-2" style="color: var(--text-secondary);">{bib.notes}</p>
           {/if}
-          <div class="flex justify-end mt-2">
+          <div class="flex justify-end mt-2 gap-2">
+            <button class="btn btn-secondary btn-xs" onclick={(e) => { e.stopPropagation(); openEdit(bib); }}>Edit</button>
             <button class="btn btn-danger btn-xs" onclick={(e) => { e.stopPropagation(); deleteBib(bib.id); }}>Remove</button>
           </div>
         </div>
@@ -123,12 +175,12 @@
 
 {#if showForm}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="modal-overlay" onclick={() => showForm = false}>
+  <div class="modal-overlay" onclick={() => { showForm = false; editingId = null; }}>
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="flex items-center justify-between mb-5">
-        <h2 class="text-lg font-bold">Add Bib</h2>
-        <button onclick={() => showForm = false} style="border: none; background: none; cursor: pointer; color: var(--text-secondary);">
+        <h2 class="text-lg font-bold">{editingId ? 'Edit Bib' : 'Add Bib'}</h2>
+        <button onclick={() => { showForm = false; editingId = null; }} style="border: none; background: none; cursor: pointer; color: var(--text-secondary);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -171,8 +223,8 @@
         </div>
       </div>
       <div class="flex gap-3 mt-6">
-        <button class="btn btn-secondary flex-1" onclick={() => showForm = false}>Cancel</button>
-        <button class="btn btn-primary flex-1" onclick={addBib} disabled={!bibNumber.trim() || !eventName.trim() || !eventDate}>Save Bib</button>
+        <button class="btn btn-secondary flex-1" onclick={() => { showForm = false; editingId = null; }}>Cancel</button>
+        <button class="btn btn-primary flex-1" onclick={addBib} disabled={!bibNumber.trim() || !eventName.trim() || !eventDate}>{editingId ? 'Save Changes' : 'Save Bib'}</button>
       </div>
     </div>
   </div>

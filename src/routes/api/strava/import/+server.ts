@@ -67,6 +67,7 @@ export const GET: RequestHandler = async ({ locals }) => {
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (activitiesRes.status === 401) return { ok: false, error: { type: 'unauthorized', raw: await activitiesRes.json() } };
+      if (activitiesRes.status === 429) return { ok: false, error: { type: 'rate_limited' } };
       if (!activitiesRes.ok) {
         const err = await activitiesRes.json();
         return { ok: false, error: err };
@@ -92,6 +93,9 @@ export const GET: RequestHandler = async ({ locals }) => {
   }
 
   if (!result.ok) {
+    if (result.error && (result.error as any).type === 'rate_limited') {
+      return json({ error: 'Strava rate limit reached. Please wait a bit and try again.' }, { status: 429 });
+    }
     let message = 'Failed to fetch activities from Strava.';
     if (result.error && typeof result.error === 'object') {
       const e = result.error as any;

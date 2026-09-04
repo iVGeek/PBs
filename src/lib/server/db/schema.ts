@@ -32,6 +32,7 @@ export const medals = pgTable('medals', {
   place: integer('place'),
   photoUrl: text('photo_url'),
   notes: text('notes'),
+  stravaActivityId: text('strava_activity_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
