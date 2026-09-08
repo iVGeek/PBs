@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { secondsToTime, secondsToPace, distMap, distEmoji, distanceKm, distanceOptions, computeAchievements } from '$lib/utils';
+  import { secondsToTime, secondsToPace, distMap, distEmoji, distanceKm, distanceOptions, computeAchievements, kmOf } from '$lib/utils';
 
   let medals = $state<any[]>([]);
   let loaded = $state(false);
@@ -52,8 +52,8 @@
     if (!compareResult.left || !compareResult.right) return null;
     const l = compareResult.left;
     const r = compareResult.right;
-    const lKm = distanceKm[l.distance] || 21.097;
-    const rKm = distanceKm[r.distance] || 21.097;
+    const lKm = kmOf(l.distance);
+    const rKm = kmOf(r.distance);
     const lPace = l.timeSeconds / lKm;
     const rPace = r.timeSeconds / rKm;
     return { lPace, rPace, sameDist: l.distance === r.distance };
@@ -99,7 +99,7 @@
         <div class="trophy-card">
           <div class="text-[10px] font-bold uppercase tracking-widest mb-2" style="color: var(--accent);">{distEmoji[dist] || '🏅'} {distMap[dist] || dist}</div>
           <div class="text-2xl font-extrabold tabular-nums tracking-tight">{secondsToTime(pb.timeSeconds)}</div>
-          <div class="text-xs mt-1" style="color: var(--text-secondary);">{secondsToPace(Math.round(pb.timeSeconds / (distanceKm[dist] || 21.097)))}/km</div>
+          <div class="text-xs mt-1" style="color: var(--text-secondary);">{secondsToPace(Math.round(pb.timeSeconds / kmOf(dist)))}/km</div>
           <div class="text-[11px] mt-2 truncate" style="color: var(--text-secondary);">{pb.raceName}</div>
           <div class="text-[10px] mt-0.5" style="color: var(--text-secondary); opacity: 0.6;">{new Date(pb.eventDate).toLocaleDateString()}</div>
         </div>
@@ -222,7 +222,7 @@
         <div class="font-bold text-sm">{l.raceName}</div>
         <div class="badge text-[10px] mt-1">{distMap[l.distance] || l.distance}</div>
         <div class="text-xl font-extrabold mt-2">{secondsToTime(l.timeSeconds)}</div>
-        <div class="text-xs" style="color: var(--text-secondary);">{secondsToPace(Math.round(l.timeSeconds / (distanceKm[l.distance] || 21.097)))}/km</div>
+        <div class="text-xs" style="color: var(--text-secondary);">{secondsToPace(Math.round(l.timeSeconds / kmOf(l.distance)))}/km</div>
         <div class="text-[10px] mt-1" style="color: var(--text-secondary);">{new Date(l.eventDate).toLocaleDateString()}</div>
         {#if l.place != null}<div class="text-xs mt-1" style="color: var(--accent);">#{l.place}</div>{/if}
       </div>
@@ -244,7 +244,7 @@
         <div class="font-bold text-sm">{r.raceName}</div>
         <div class="badge text-[10px] mt-1">{distMap[r.distance] || r.distance}</div>
         <div class="text-xl font-extrabold mt-2">{secondsToTime(r.timeSeconds)}</div>
-        <div class="text-xs" style="color: var(--text-secondary);">{secondsToPace(Math.round(r.timeSeconds / (distanceKm[r.distance] || 21.097)))}/km</div>
+        <div class="text-xs" style="color: var(--text-secondary);">{secondsToPace(Math.round(r.timeSeconds / kmOf(r.distance)))}/km</div>
         <div class="text-[10px] mt-1" style="color: var(--text-secondary);">{new Date(r.eventDate).toLocaleDateString()}</div>
         {#if r.place != null}<div class="text-xs mt-1" style="color: var(--accent);">#{r.place}</div>{/if}
       </div>

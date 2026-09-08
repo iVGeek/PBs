@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
-    secondsToTime, secondsToPace, distMap, distEmoji, distanceKm,
+    secondsToTime, secondsToPace, distMap, distEmoji, distanceKm, categorizeDistance, kmOf,
     distanceOptions, totalDistanceKm, racesByYear, timelineGroups,
     filterMedals, getYears, computePBs
   } from '$lib/utils';
@@ -325,7 +325,13 @@
       }
       if (!eventDate) { skipped++; continue; }
       let distance = get(['distance', 'dist']);
-      if (!distance || !distanceOptions.includes(distance)) distance = '5K';
+      if (!distance) { skipped++; continue; }
+      // Accept known labels OR any numeric km value (e.g. "10.5") — no silent fallback to 5K.
+      if (!distanceOptions.includes(distance)) {
+        const numeric = parseFloat(distance);
+        if (!isNaN(numeric) && numeric > 0) distance = `${numeric.toFixed(1)} km`;
+      }
+      if (!distanceOptions.includes(distance) && isNaN(parseFloat(distance))) { skipped++; continue; }
       const timeStr = get(['time_seconds', 'time']);
       let timeSeconds = 0;
       if (/^\d+$/.test(timeStr)) timeSeconds = parseInt(timeStr);
@@ -344,17 +350,6 @@
     await loadAll();
     if (imported > 0) importSuccess = `Imported ${imported} race${imported !== 1 ? 's' : ''}${skipped ? ` · ${skipped} skipped` : ''}.`;
     else errorMsg = 'No new races imported from CSV.';
-  }
-
-  function categorizeDistance(km: number): string {
-    if (km >= 4.8 && km <= 5.2) return '5K';
-    if (km >= 9.8 && km <= 10.2) return '10K';
-    if (km >= 14.8 && km <= 15.2) return '15K';
-    if (km >= 20.8 && km <= 21.3) return '21K';
-    if (km >= 29.8 && km <= 30.3) return '30K';
-    if (km >= 34.8 && km <= 35.3) return '35K';
-    if (km >= 41.8 && km <= 42.6) return '42K';
-    return km.toFixed(2) + ' km';
   }
 
   let importProgress = $state(0);
@@ -388,21 +383,26 @@
       }
       const acts = Array.isArray(data?.activities) ? data.activities : [];
       if (acts.length === 0) { errorMsg = 'Strava returned no activities (check that you have running activities and that the app has activity:read_all permission).'; importing = false; return; }
-      const runTypes = ['Run', 'TrailRun', 'VirtualRun'];
-      const running = acts.filter((a: any) => runTypes.includes(a.type));
-      if (running.length === 0) { errorMsg = 'No running activities found — only Run/TrailRun/VirtualRun are imported.'; importing = false; return; }
-      // Skip anything already imported (by Strava activity id, with name fallback for legacy rows)
-      const existingById = new Set(medals.map((m: any) => m.stravaActivityId).filter(Boolean));
-      const existingByName = new Set(medals.map((m: any) => m.raceName));
-      const toImport = running.filter((a: any) => !existingById.has(String(a.id)));
-      if (toImport.length === 0) { importing = false; errorMsg = 'Nothing new to import — your Strava races are already on the wall.'; await loadAll(); return; }
+      // Skip anything already imported by Strava activity id. For legacy rows without an id,
+      // fall back to matching name + date so we never skip a real activity just for sharing a name.
+      const existingById = new Set(medals.map((m: any) => m.stravaActivityId && String(m.stravaActivityId)).filter(Boolean));
+      const existingByNameDate = new Set(
+        medals
+          .filter((m: any) => !m.stravaActivityId)
+          .map((m: any) => `${m.raceName}|${new Date(m.eventDate).toISOString().slice(0, 10)}`)
+      );
+      const toImport = acts.filter((a: any) => {
+        const sid = String(a.id);
+        const legacyKey = `${a.name}|${String(a.start_date).slice(0, 10)}`;
+        return !existingById.has(sid) && !existingByNameDate.has(legacyKey);
+      });
+      if (toImport.length === 0) { importing = false; errorMsg = 'Nothing new to import — your Strava activities are already on the wall.'; await loadAll(); return; }
       importTotal = toImport.length;
       let imported = 0;
       let skipped = 0;
       for (const act of toImport) {
         const km = act.distance / 1000;
         const dist = categorizeDistance(km);
-        if (existingByName.has(act.name)) { skipped++; importProgress++; continue; }
         const res2 = await fetch('/api/medals', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ raceName: act.name, eventDate: act.start_date, distance: dist, timeSeconds: Math.round(act.moving_time), place: null, stravaActivityId: String(act.id) }),
@@ -413,8 +413,8 @@
       await loadAll();
       importing = false;
       errorMsg = '';
-      if (imported > 0) importSuccess = `Imported ${imported} race${imported !== 1 ? 's' : ''}${skipped ? ` · ${skipped} skipped` : ''}.`;
-      else errorMsg = 'No new races could be imported.';
+      if (imported > 0) importSuccess = `Imported ${imported} activit${imported !== 1 ? 'ies' : 'y'}${skipped ? ` · ${skipped} skipped` : ''}.`;
+      else errorMsg = 'No new activities could be imported.';
     } catch { importing = false; errorMsg = 'Network error. Please try again.'; }
   }
 
@@ -572,7 +572,7 @@
       <a href="/pbs" class="trophy-card no-underline" style="text-decoration: none; color: inherit;">
         <div class="text-[10px] font-bold uppercase tracking-widest mb-1" style="color: var(--accent);">{distEmoji[dist] || '🏅'} {distMap[dist] || dist}</div>
         <div class="text-lg font-extrabold tabular-nums tracking-tight">{secondsToTime(pb.timeSeconds)}</div>
-        <div class="text-[11px] mt-0.5" style="color: var(--text-secondary);">{secondsToPace(Math.round(pb.timeSeconds / (distanceKm[dist] || 21.097)))}/km</div>
+        <div class="text-[11px] mt-0.5" style="color: var(--text-secondary);">{secondsToPace(Math.round(pb.timeSeconds / (kmOf(dist))))}/km</div>
       </a>
     {/each}
   </div>
@@ -610,7 +610,7 @@
               <div class="flex items-center gap-1.5 text-[11px] text-white/70">
                 <span>{secondsToTime(medal.timeSeconds)}</span>
                 <span>·</span>
-                <span>{secondsToPace(Math.round(medal.timeSeconds / (distanceKm[medal.distance] || 21.097)))}/km</span>
+                <span>{secondsToPace(Math.round(medal.timeSeconds / (kmOf(medal.distance))))}/km</span>
                 {#if medal.place != null}
                   <span>·</span>
                   <span>#{medal.place}</span>
@@ -675,6 +675,7 @@
           <div>
             <label class="label" for="m-dist">Distance</label>
             <select id="m-dist" class="input" bind:value={distance}>
+              {#if distance && !distanceOptions.includes(distance)}<option value={distance}>{distMap[distance] || distance}</option>{/if}
               {#each distanceOptions as d}
                 <option value={d}>{distMap[d] || d}</option>
               {/each}

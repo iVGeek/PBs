@@ -29,6 +29,24 @@ export const distanceKm: Record<string, number> = {
   '30K': 30, '35K': 35, '42K': 42.195, '50K': 50,
 };
 
+export function kmOf(distance: string): number {
+  const known = distanceKm[distance];
+  if (known) return known;
+  const n = parseFloat(distance);
+  return isNaN(n) ? 0 : n;
+}
+
+export function categorizeDistance(km: number): string {
+  if (km >= 4.8 && km <= 5.2) return '5K';
+  if (km >= 9.8 && km <= 10.2) return '10K';
+  if (km >= 14.8 && km <= 15.2) return '15K';
+  if (km >= 20.8 && km <= 21.3) return '21K';
+  if (km >= 29.8 && km <= 30.3) return '30K';
+  if (km >= 34.8 && km <= 35.3) return '35K';
+  if (km >= 41.8 && km <= 42.6) return '42K';
+  return km >= 1 ? `${km.toFixed(1)} km` : `${(km * 1000).toFixed(0)} m`;
+}
+
 export function secondsToTime(s: number): string {
   const hrs = Math.floor(s / 3600);
   const min = Math.floor((s % 3600) / 60);
@@ -89,13 +107,11 @@ export interface Achievement {
 }
 
 export function computeAchievements(medals: { distance: string; timeSeconds: number; eventDate: string }[]): Achievement[] {
-  const distCounts = new Map<string, number>();
   const distBests = new Map<string, number>();
   const years = new Set<number>();
   let totalKm = 0;
 
   for (const m of medals) {
-    distCounts.set(m.distance, (distCounts.get(m.distance) || 0) + 1);
     const best = distBests.get(m.distance);
     if (!best || m.timeSeconds < best) distBests.set(m.distance, m.timeSeconds);
     years.add(new Date(m.eventDate).getFullYear());

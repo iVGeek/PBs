@@ -1,7 +1,8 @@
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { medals, userTable } from '$lib/server/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import { categorizeDistance } from '$lib/utils';
 
 type DbUser = {
   id: string;
@@ -92,17 +93,6 @@ export async function getStravaActivities(dbUser: DbUser): Promise<{ ok: boolean
   return result;
 }
 
-function categorizeDistance(km: number): string {
-  if (km >= 4.8 && km <= 5.2) return '5K';
-  if (km >= 9.8 && km <= 10.2) return '10K';
-  if (km >= 14.8 && km <= 15.2) return '15K';
-  if (km >= 20.8 && km <= 21.3) return '21K';
-  if (km >= 29.8 && km <= 30.3) return '30K';
-  if (km >= 34.8 && km <= 35.3) return '35K';
-  if (km >= 41.8 && km <= 42.6) return '42K';
-  return km.toFixed(2) + ' km';
-}
-
 export async function syncStravaToMedals(userId: string): Promise<{ imported: number; skipped: number; error?: string }> {
   const dbUser = (await db.select().from(userTable).where(eq(userTable.id, userId))).at(0) as DbUser | undefined;
   if (!dbUser) return { imported: 0, skipped: 0, error: 'User not found' };
@@ -115,22 +105,30 @@ export async function syncStravaToMedals(userId: string): Promise<{ imported: nu
     return { imported: 0, skipped: 0, error: 'Could not fetch Strava activities.' };
   }
 
-  const runTypes = ['Run', 'TrailRun', 'VirtualRun'];
-  const running = result.activities!.filter((a: any) => runTypes.includes(a.type));
+  const activities = result.activities!;
 
-  const existing = await db.select({ id: medals.id, stravaActivityId: medals.stravaActivityId, raceName: medals.raceName })
-    .from(medals).where(eq(medals.userId, userId));
-  const byId = new Set(existing.map((m) => m.stravaActivityId).filter(Boolean));
-  const byName = new Set(existing.map((m) => m.raceName));
+  const existing = await db.select({
+    id: medals.id,
+    stravaActivityId: medals.stravaActivityId,
+    raceName: medals.raceName,
+    eventDate: medals.eventDate,
+  }).from(medals).where(eq(medals.userId, userId));
+  const byId = new Set(existing.map((m) => m.stravaActivityId && String(m.stravaActivityId)).filter(Boolean));
+  const byNameDate = new Set(
+    existing
+      .filter((m) => !m.stravaActivityId)
+      .map((m) => `${m.raceName}|${new Date(m.eventDate).toISOString().slice(0, 10)}`)
+  );
 
   let imported = 0;
   let skipped = 0;
   const insertValues: any[] = [];
-  for (const act of running) {
+  for (const act of activities) {
     const km = act.distance / 1000;
     const dist = categorizeDistance(km);
     const sid = String(act.id);
-    if (byId.has(sid) || byName.has(act.name)) { skipped++; continue; }
+    const legacyKey = `${act.name}|${String(act.start_date).slice(0, 10)}`;
+    if (byId.has(sid) || byNameDate.has(legacyKey)) { skipped++; continue; }
     insertValues.push({
       userId,
       raceName: act.name,
@@ -141,7 +139,7 @@ export async function syncStravaToMedals(userId: string): Promise<{ imported: nu
       stravaActivityId: sid,
     });
     byId.add(sid);
-    byName.add(act.name);
+    byNameDate.add(legacyKey);
   }
 
   if (insertValues.length) {
