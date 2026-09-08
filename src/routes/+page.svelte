@@ -355,6 +355,7 @@
   let importProgress = $state(0);
   let importTotal = $state(0);
   let importSuccess = $state('');
+  let importWarning = $state('');
   let exportOpen = $state(false);
   let toast = $state('');
   let confirmDeleteId = $state('');
@@ -367,7 +368,7 @@
   }
 
   async function importFromStrava() {
-    importing = true; errorMsg = ''; reconnectNeeded = false; importProgress = 0; importTotal = 0;
+    importing = true; errorMsg = ''; importWarning = ''; reconnectNeeded = false; importProgress = 0; importTotal = 0;
     try {
       const res = await fetch('/api/strava/import');
       let data: any = null;
@@ -382,6 +383,7 @@
         importing = false; return;
       }
       const acts = Array.isArray(data?.activities) ? data.activities : [];
+      if (typeof data?.scopeWarning === 'string' && data.scopeWarning) importWarning = data.scopeWarning;
       if (acts.length === 0) { errorMsg = 'Strava returned no activities (check that you have running activities and that the app has activity:read_all permission).'; importing = false; return; }
       // Skip anything already imported by Strava activity id. For legacy rows without an id,
       // fall back to matching name + date so we never skip a real activity just for sharing a name.
@@ -440,6 +442,14 @@
     {#if reconnectNeeded}
       <a href="/api/strava/auth" class="underline font-semibold ml-1" style="color: #fbbf24;">Reconnect Strava →</a>
     {/if}
+  </div>
+{/if}
+
+<!-- Warning -->
+{#if importWarning}
+  <div class="rounded-xl mb-6 px-4 py-3 text-sm font-medium flex flex-wrap items-center gap-2" style="background: rgba(250,204,21,0.08); border: 1px solid rgba(250,204,21,0.25); color: #facc15;">
+    <span>{importWarning}</span>
+    <a href="/api/strava/auth" class="underline font-semibold ml-1" style="color: #fbbf24;">Reconnect Strava →</a>
   </div>
 {/if}
 

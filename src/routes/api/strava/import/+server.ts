@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { getStravaActivities } from '$lib/server/strava';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ locals }) => {
+export const GET: RequestHandler = async ({ locals, cookies }) => {
   const { user } = locals;
   if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -24,5 +24,14 @@ export const GET: RequestHandler = async ({ locals }) => {
     return json({ error: message }, { status: 400 });
   }
 
-  return json({ activities: result.activities });
+  const grantedScope = (cookies.get('strava_scope') ?? '').split(/\s+/).filter(Boolean);
+  const hasFullAccess = grantedScope.some((s) => s.toLowerCase() === 'activity:read_all');
+  const scopeWarning =
+    grantedScope.length > 0 && !hasFullAccess
+      ? 'Your Strava connection is missing the "activity:read_all" permission, so private activities are hidden from import. Reconnect Strava and approve full activity access to import everything.'
+      : '';
+  return json({
+    activities: result.activities,
+    scopeWarning,
+  });
 };

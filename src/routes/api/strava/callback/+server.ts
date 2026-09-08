@@ -30,6 +30,15 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
   const accessToken = tokenData.access_token;
   const refreshToken = tokenData.refresh_token;
   const expiresAt = new Date(tokenData.expires_at * 1000);
+  const grantedScope = typeof tokenData.scope === 'string' ? tokenData.scope : '';
+
+  cookies.set('strava_scope', grantedScope, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 365,
+  });
 
   let user = (await db.select().from(userTable).where(eq(userTable.stravaId, stravaId))).at(0);
 
