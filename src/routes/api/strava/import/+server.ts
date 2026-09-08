@@ -17,6 +17,7 @@ export const GET: RequestHandler = async ({ locals }) => {
     const type = (result.error as any)?.type;
     if (type === 'rate_limited') return json({ error: 'Strava rate limit reached. Please wait a bit and try again.' }, { status: 429 });
     if (type === 'no_token' || type === 'unauthorized') return json({ error: 'Strava token expired. Please reconnect Strava.' }, { status: 401 });
+    if (type === 'forbidden') return json({ error: 'Strava denied access to your activities. Reconnect Strava and approve full activity access.', reconnect: true }, { status: 403 });
     let message = 'Failed to fetch activities from Strava.';
     const e = result.error as any;
     if (e && e.message) message = e.message;

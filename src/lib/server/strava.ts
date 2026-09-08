@@ -62,6 +62,7 @@ export async function getStravaActivities(dbUser: DbUser): Promise<{ ok: boolean
       }
       if (res.status === 401) return { ok: false, error: { type: 'unauthorized' } };
       if (res.status === 429) return { ok: false, error: { type: 'rate_limited' } };
+      if (res.status === 403) return { ok: false, error: { type: 'forbidden' } };
       if (!res.ok) {
         let body: any = { message: `Strava error ${res.status}` };
         try { body = await res.json(); } catch { /* ignore */ }

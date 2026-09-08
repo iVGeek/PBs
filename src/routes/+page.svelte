@@ -18,6 +18,7 @@
   let lightboxPhoto = $state('');
   let importing = $state(false);
   let errorMsg = $state('');
+  let reconnectNeeded = $state(false);
   let loaded = $state(false);
 
   let raceName = $state('');
@@ -371,12 +372,13 @@
   }
 
   async function importFromStrava() {
-    importing = true; errorMsg = ''; importProgress = 0; importTotal = 0;
+    importing = true; errorMsg = ''; reconnectNeeded = false; importProgress = 0; importTotal = 0;
     try {
       const res = await fetch('/api/strava/import');
       let data: any = null;
       try { data = await res.json(); } catch { /* non-JSON body */ }
       if (!res.ok || data?.error) {
+        reconnectNeeded = !!data?.reconnect;
         errorMsg = (data && typeof data.error === 'string') ? data.error
           : (data?.message) ? data.message
           : (res.status === 401) ? 'Strava token expired. Please reconnect Strava.'
@@ -435,6 +437,9 @@
 {#if errorMsg}
   <div class="rounded-xl mb-6 px-4 py-3 text-sm font-medium" style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #f87171;">
     {errorMsg}
+    {#if reconnectNeeded}
+      <a href="/api/strava/auth" class="underline font-semibold ml-1" style="color: #fbbf24;">Reconnect Strava →</a>
+    {/if}
   </div>
 {/if}
 
