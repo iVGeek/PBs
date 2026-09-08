@@ -68,3 +68,12 @@
     </a>
   </div>
 {/if}
+
+<footer class="max-w-6xl mx-auto px-4 md:px-6 pb-8" style="color: var(--text-secondary);">
+  <div class="flex flex-col sm:flex-row items-center justify-between gap-3 border-t pt-6" style="border-color: var(--border);">
+    <span class="text-xs">🏆 RaceWall — made for runners</span>
+    <a href="https://strava.com/athletes/137308704" class="strava-badge- strava-badge-follow" target="_blank" rel="noopener" aria-label="Follow me on Strava">
+      <img src="//badges.strava.com/echelon-sprite-48.png" alt="Strava" />
+    </a>
+  </div>
+</footer>
