@@ -56,3 +56,4 @@ In Strava API settings, set **Authorization Callback Domain** to `pbs-buyz.onren
 ```bash
 npm run build
 ```
+chore: verify deploy pipeline
