@@ -3,6 +3,12 @@
   import { page } from '$app/stores';
   import { applyTheme, applyFont } from '$lib/theme';
   let { children, data } = $props();
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  }
+
   $effect(() => { applyTheme(); applyFont(); });
 </script>
 
@@ -32,9 +38,7 @@
           <img src={data.user.avatar} alt="" class="w-8 h-8 rounded-full object-cover border" style="border-color: var(--border);" />
         {/if}
         <span class="text-sm font-medium hidden sm:inline" style="color: var(--text-secondary);">{data.user.name}</span>
-        <form action="/login" method="get">
-          <button class="btn btn-ghost btn-xs" type="submit">Logout</button>
-        </form>
+        <button class="btn btn-ghost btn-xs" onclick={logout}>Logout</button>
       </div>
     </div>
   </nav>

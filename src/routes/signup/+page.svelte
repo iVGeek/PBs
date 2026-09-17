@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
 
+  let name = $state('');
   let email = $state('');
   let password = $state('');
   let loading = $state(false);
@@ -16,21 +17,29 @@
     stravaError = $page.url.searchParams.get('error');
   });
 
-  async function login() {
+  async function signup() {
     formError = '';
+    if (!email.trim() || !password || !name.trim()) {
+      formError = 'Please fill in all fields.';
+      return;
+    }
+    if (password.length < 8) {
+      formError = 'Password must be at least 8 characters.';
+      return;
+    }
     loading = true;
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
       });
       const data = await res.json();
       loading = false;
       if (data.success) {
-        window.location.href = '/';
+        window.location.href = '/register';
         return;
       }
-      formError = data.error || 'Login failed. Please try again.';
+      formError = data.error || 'Sign up failed. Please try again.';
     } catch {
       loading = false;
       formError = 'Network error. Please try again.';
@@ -42,20 +51,21 @@
   <div class="card max-w-md w-full text-center card-interactive" style="padding: 3.5rem 2.5rem;">
     <div class="text-6xl mb-5">🏆</div>
     <h1 class="text-3xl font-extrabold mb-2 tracking-tight">RaceWall</h1>
-    <p class="text-sm mb-8" style="color: var(--text-secondary);">Your personal race medal portfolio. Track medals, bibs, and personal bests.</p>
+    <p class="text-sm mb-8" style="color: var(--text-secondary);">Create your account. Track medals, bibs, and personal bests.</p>
 
     <!-- Email / Password -->
     <form
       class="space-y-3 mb-5 text-left"
-      onsubmit={(e) => { e.preventDefault(); login(); }}
+      onsubmit={(e) => { e.preventDefault(); signup(); }}
     >
+      <input class="input w-full" type="text" bind:value={name} placeholder="Your name" autocomplete="name" required />
       <input class="input w-full" type="email" bind:value={email} placeholder="Email" autocomplete="email" required />
-      <input class="input w-full" type="password" bind:value={password} placeholder="Password" autocomplete="current-password" required />
+      <input class="input w-full" type="password" bind:value={password} placeholder="Password (8+ characters)" autocomplete="new-password" required />
       {#if formError}
         <p class="text-xs font-medium" style="color: #f87171;">{formError}</p>
       {/if}
-      <button class="btn btn-primary w-full" type="submit" disabled={loading || !email || !password} style="padding: 0.75rem;">
-        {loading ? 'Signing in...' : 'Log In'}
+      <button class="btn btn-primary w-full" type="submit" disabled={loading || !email || !password || !name} style="padding: 0.75rem;">
+        {loading ? 'Creating account...' : 'Create Account'}
       </button>
     </form>
 
@@ -75,8 +85,8 @@
     {/if}
 
     <p class="mt-6 text-sm" style="color: var(--text-secondary);">
-      New here?
-      <a href="/signup" style="color: var(--accent); font-weight: 600;">Create an account</a>
+      Already have an account?
+      <a href="/login" style="color: var(--accent); font-weight: 600;">Log in</a>
     </p>
   </div>
 </div>

@@ -6,16 +6,23 @@
   let paid = $state($page.data.user?.paid || false);
   let error = $state('');
   let fallbackNote = $state('');
+  let email = $state($page.data.user?.email || '');
 
   $effect(() => { paid = $page.data.user?.paid || false; });
 
   async function initPayment() {
     error = ''; fallbackNote = ''; loading = true;
+    const cleanEmail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      loading = false;
+      error = 'Please enter a valid email address for your receipt.';
+      return;
+    }
     try {
       const res = await fetch('/api/paystack/initialize', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: $page.data.user?.email || 'runner@example.com',
+          email: cleanEmail,
           currency: $page.data.currency?.code || 'KES',
           amount: $page.data.amount || 500000,
         }),
@@ -57,6 +64,9 @@
       </div>
       {#if fallbackNote}
         <p class="mb-3 text-xs" style="color: var(--text-secondary);">{fallbackNote}</p>
+      {/if}
+      {#if !$page.data.user?.email}
+        <input class="input w-full text-center mb-3" type="email" bind:value={email} placeholder="Your email (for your receipt)" autocomplete="email" />
       {/if}
       {#if error}
         <p class="mb-3 text-sm font-medium" style="color: #f87171;">{error}</p>

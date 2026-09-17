@@ -8,6 +8,7 @@ export const userTable = pgTable('user', {
   stravaTokenExpiresAt: timestamp('strava_token_expires_at', { withTimezone: true }),
   name: text('name').notNull().default(''),
   email: text('email'),
+  passwordHash: text('password_hash'),
   avatar: text('avatar'),
   bio: text('bio').default(''),
   units: text('units').notNull().default('km'),

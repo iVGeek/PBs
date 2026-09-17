@@ -4,7 +4,7 @@ import type { LayoutServerLoad } from './$types';
 export const load: LayoutServerLoad = async ({ locals, url }) => {
   const { user } = locals;
   const path = url.pathname;
-  const publicRoutes = ['/login'];
+  const publicRoutes = ['/login', '/signup'];
   const isPublic = publicRoutes.some((r) => path.startsWith(r));
   const isApi = path.startsWith('/api');
 

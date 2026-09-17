@@ -16,6 +16,8 @@ SvelteKit 5 · TypeScript · Tailwind CSS v4 · Supabase (PostgreSQL) · Drizzle
 - **Strava Import** — Sync activities from Strava
 - **Theme Studio** — 18 themes + custom accent colors + font switching
 - **Dark Theme** — Premium dark UI
+- **Accounts** — Email + password signup/login, or continue with Strava
+- **Paywall** — One-time Paystack payment unlock (free-tier friendly)
 
 ## Development
 
@@ -35,6 +37,15 @@ npm run dev
 | `PUBLIC_PAYSTACK_PUBLIC_KEY` | From Paystack dashboard |
 | `PAYSTACK_SECRET_KEY` | From Paystack dashboard |
 | `PUBLIC_BASE_URL` | `https://pbs-buyz.onrender.com` |
+
+Schema changes are applied automatically on deploy via `npx drizzle-kit push --force` (see `render.yaml`). To apply locally: `npm run db:push`.
+
+## Paystack Setup
+
+1. Create a [Paystack](https://paystack.com) account and complete business verification (required for live payments).
+2. In Paystack Dashboard → Settings → API Keys → **Add certified domain**: `pbs-buyz.onrender.com`.
+3. Set **live** keys in Render → Environment: `PAYSTACK_SECRET_KEY` (`sk_live_...`) and `PUBLIC_PAYSTACK_PUBLIC_KEY` (`pk_live_...`).
+4. Price is set in `src/lib/server/currency.ts` → `BASE_AMOUNT_KES` (currently KES 5,000; auto-converted to NGN/GHS/ZAR/etc. per visitor locale).
 
 ## Strava Setup
 
