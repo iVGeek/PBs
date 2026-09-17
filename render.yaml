@@ -3,7 +3,7 @@ services:
     name: pbs
     env: node
     buildCommand: npm install && npm run build
-    startCommand: npx drizzle-kit push --force && node build/index.js
+    startCommand: node build/index.js
     envVars:
       - key: NODE_ENV
         value: production

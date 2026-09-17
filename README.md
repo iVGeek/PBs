@@ -38,7 +38,7 @@ npm run dev
 | `PAYSTACK_SECRET_KEY` | From Paystack dashboard |
 | `PUBLIC_BASE_URL` | `https://pbs-buyz.onrender.com` |
 
-Schema changes are applied automatically on deploy via `npx drizzle-kit push --force` (see `render.yaml`). To apply locally: `npm run db:push`.
+Schema changes are applied automatically at server startup (see `src/lib/server/db/bootstrap.ts`). Table creation/backups for new tables must be applied manually (`npm run db:push`).
 
 ## Paystack Setup
 
